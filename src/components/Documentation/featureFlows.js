@@ -131,9 +131,16 @@ export const FEATURE_FLOWS = {
   'team-member:notes': `flowchart TD
   A(["Open Documents"]) --> B{"Have a document?"}
   B -->|No| C["Create, migrate legacy, or import"]
-  B -->|Yes| D["Pick document from sidebar"]
+  B -->|Yes| D["Pick document from sidebar tree"]
   C --> D
-  D --> E[/"Edit title & rich text"/]
+  D --> O{"Organize tabs?"}
+  O -->|Add sub-tab| P["Nested under parent (max 3 levels)"]
+  O -->|Drag to reorder/nest| Q["Depth clamped; new order saved"]
+  O -->|Delete a parent| R["Removes its sub-tabs too (with warning)"]
+  P --> E
+  Q --> E
+  O -->|"No, just edit"| E
+  E[/"Edit title & rich text"/]
   E --> J{"Bring in content?"}
   J -->|Upload .docx/.html| K["Convert & sanitize"]
   J -->|Paste from Google Docs| K
