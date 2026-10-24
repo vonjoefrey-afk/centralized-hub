@@ -1,0 +1,4 @@
+setTimeout(() => {
+  process.env.GEMINI_API_KEY = "AIzaSyD-iqQ1bDbLgW2aFdGSVAPs-sffHdEkcw8"
+  rotateShifts({ data: { teamId: "Y3de2NlLXayCHRLlAUWg" } }, { auth: { uid: "admin_uid", token: { email: "orpiavonjoefrey@gmail.com" } } }).then(res => { console.log("LIVE_SUCCESS:", JSON.stringify(res, null, 2)); process.exit(0); }).catch(err => { console.error("LIVE_ERROR:", err); process.exit(1); })
+}, 10000)

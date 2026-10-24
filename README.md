@@ -1,139 +1,79 @@
 # Team Management Application
 
-A React-based team management application with role-based access control using Firebase authentication and Firestore database.
+A modern, high-performance React application built with Vite and Firebase for comprehensive team management, featuring robust role-based access control and SPII monitoring.
 
-## Features
+## ✨ Features
 
-### Authentication
-- User registration and login
-- Role-based access control (Admin, Team Leader, Team Member)
-- Protected routes based on user roles
+### Authentication & RBAC
+- **Secure Authentication**: Firebase Auth with secondary Google SSO migration path.
+- **Granular Roles**: 
+  - **Admin**: System-wide management, user approval, and feature flag control.
+  - **Trainer**: Global update distribution across all teams.
+  - **Team Leader (TL)**: Team-specific management, shift rotations, and case tracking overviews.
+  - **Team Member**: Access to personal tools, templates, and shift acknowledgment.
 
-### Admin Dashboard
-- User management with role assignment
-- View all users and their current roles
-- Change user roles dynamically
-- Placeholder tabs for future features (System Settings, Analytics)
+### Dashboards & Tools
+- **Case Tracker**: Real-time logging of customer interactions with precision sorting.
+- **Shift Management**: AI-powered shift rotation with automated notifications to Google Chat.
+- **SPII Monitoring**: Real-time detection of Sensitive Personal Identifiable Information with automated audit logging.
+- **Template Library**: Organized storage for commonly used team responses with easy copy-paste.
+- **Metric Analytics**: Visual data representations for team productivity and status.
 
-### Team Leader Dashboard
-- Create and manage teams
-- Upload updates that need acknowledgment from team members
-- View team updates and their status
-- Placeholder tabs for future features (Team Members, Analytics)
+## 🛠️ Tech Stack
 
-### Team Member Dashboard
-- View pending updates that need acknowledgment
-- Acknowledge updates from team leaders
-- View previously acknowledged updates
-- Placeholder tabs for future features (Team Info, My Activity)
+- **Framework**: [React 18](https://reactjs.org/) + [Vite](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **State Management**: React Context API
+- **Backend/DB**: [Firebase](https://firebase.google.com/) (Auth, Firestore, Cloud Functions)
+- **Monitoring**: Google Cloud Logging & Error Reporting
 
-## Tech Stack
+## 🚀 Setup Instructions
 
-- **Frontend**: React 18, React Router DOM
-- **Styling**: Tailwind CSS
-- **Backend**: Firebase (Authentication, Firestore)
-- **Deployment**: Ready for GitHub deployment
-
-## Setup Instructions
-
-1. **Install dependencies**:
+1. **Install Dependencies**:
    ```bash
    npm install
    ```
 
-2. **Configure Firebase**:
-   - Create a Firebase project at https://console.firebase.google.com
-   - Enable Authentication (Email/Password)
-   - Enable Firestore Database
-   - Copy your Firebase config and replace the placeholder values in `src/firebase/config.js`
-
-3. **Set up Firestore Security Rules**:
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       // Users can read/write their own user document
-       match /users/{userId} {
-         allow read, write: if request.auth != null && request.auth.uid == userId;
-       }
-       
-       // Admins can read/write all user documents
-       match /users/{userId} {
-         allow read, write: if request.auth != null && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-       }
-       
-       // Teams are readable by team members and leaders
-       match /teams/{teamId} {
-         allow read: if request.auth != null && 
-           (resource.data.teamLeaderId == request.auth.uid || 
-            resource.data.members[request.auth.uid] in resource.data.members);
-         allow write: if request.auth != null && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader';
-       }
-       
-       // Updates are readable by team members
-       match /updates/{updateId} {
-         allow read: if request.auth != null && 
-           get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.members[request.auth.uid] in get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.members;
-         allow write: if request.auth != null && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader';
-       }
-       
-       // Acknowledgments are readable/writable by team members
-       match /acknowledgments/{ackId} {
-         allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
-       }
-     }
-   }
-   ```
-
-4. **Start the development server**:
+2. **Configure Environment Variables**:
+   Your credentials are never stored in the code. Copy the template and fill in your Firebase values:
    ```bash
-   npm start
+   cp .env.example .env
+   ```
+   *Edit `.env` with your actual Firebase Project keys.*
+
+3. **Deploy Cloud Functions**:
+   This app requires backend functions for password management and shift automation:
+   ```bash
+   cd functions
+   npm install
+   firebase deploy --only functions
    ```
 
-## Project Structure
+4. **Start Development Server**:
+   ```bash
+   npm run dev
+   ```
+
+## 📁 Project Structure
 
 ```
 src/
-├── components/
-│   ├── dashboards/
-│   │   ├── AdminDashboard.js
-│   │   ├── TeamLeaderDashboard.js
-│   │   └── TeamMemberDashboard.js
-│   ├── LoginForm.js
-│   └── ProtectedRoute.js
-├── contexts/
-│   └── AuthContext.js
-├── firebase/
-│   ├── auth.js
-│   ├── config.js
-│   └── firestore.js
-├── App.js
-├── index.js
-└── index.css
+├── components/          # Reusable UI components and Dashboard Tabs
+├── contexts/            # Auth and Theme context providers
+├── firebase/            # Firebase SDK initialization and helpers
+├── hooks/               # Custom React hooks
+├── services/            # API and notification services
+├── utils/               # Handlers for logging, audio, and SPII detection
+└── design-tokens.js     # Global design system configuration
 ```
 
-## User Roles
+## 🔒 Security
+- **Strict Linting**: Environment variables are checked at runtime.
+- **Secure Config**: Service account keys and .env files are excluded from version control.
+- **RBAC**: Firestore rules ensure users can only access data permitted by their verified role.
 
-- **Admin**: Can manage user roles and permissions
-- **Team Leader**: Can create teams and upload updates for acknowledgment
-- **Team Member**: Can acknowledge updates and view team information
+---
+© 2026 Team Management App
 
-## Future Enhancements
 
-The application is designed with placeholder tabs for future features:
-- System Settings and Analytics for Admins
-- Team Member management and Analytics for Team Leaders
-- Team Info and Activity tracking for Team Members
 
-## Deployment
-
-The application is ready for deployment to platforms like:
-- Firebase Hosting
-- Vercel
-- Netlify
-- GitHub Pages
-
-Make sure to set up environment variables for production Firebase configuration.

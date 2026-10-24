@@ -2,16 +2,433 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   DESIGN SYSTEM — CSS TOKENS (Light + Dark)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Aurora Signal identity. Hex grounds mirror src/theme/auroraSignal.js so the
+   charts and the chrome share one palette — keep the two in sync. */
+:root {
+  /* Light = Nordic Frost */
+  --surface-page:    #f6f8fc;
+  --surface-card:    #ffffff;
+  --surface-raised:  #eef3fa;
+  --border-subtle:   rgba(15, 23, 42, 0.08);
+  --text-primary:    #0f1720;
+  --text-secondary:  #5a6b85;
+  --text-muted:      #93a0b4;
+  --scrollbar-track: #eef3fa;
+  --scrollbar-thumb: #cbd5e1;
+
+  /* Accent — indigo→cyan aurora. Triples power Tailwind alpha (bg-accent/10).
+     Light uses a deeper indigo so white text on the accent stays ≥4.5:1. */
+  --accent-rgb:      79 70 229;   /* #4F46E5 */
+  --accent-2-rgb:    14 154 184;  /* #0E9AB8 */
+  --accent-from:     #6366f1;
+  --accent-to:       #22d3ee;
+  --vitals-from:     #ff5e8a;
+  --vitals-to:       #7a5cff;
+  --glow-cyan:       rgba(34, 211, 238, 0.45);
+  --glow-magenta:    rgba(240, 47, 194, 0.40);
+  --grad-accent:     linear-gradient(120deg, var(--accent-from), var(--accent-to));
+}
+
+.dark {
+  /* Dark = Midnight Aurora + Cyber Neon signals */
+  --surface-page:    #0a0b12;
+  --surface-card:    #14161f;
+  --surface-raised:  #1a1d28;
+  --border-subtle:   rgba(255, 255, 255, 0.08);
+  --text-primary:    #eef0f7;
+  --text-secondary:  #9298ae;
+  --text-muted:      #5e6478;
+  --scrollbar-track: #0f1119;
+  --scrollbar-thumb: #2a2e3d;
+
+  /* Brighter signal steps read on the dark ground */
+  --accent-rgb:      99 102 241;  /* #6366F1 */
+  --accent-2-rgb:    34 211 238;  /* #22D3EE */
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   BASE RESET
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--surface-page);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   GLOBAL DARK MODE — NATIVE ELEMENT OVERRIDES
+   This blanket-fixes unthemed Tailwind components
+   without touching JSX files.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Cards / Panels — anything that was bg-white or bg-gray-50 → Aurora surfaces */
+.dark .bg-white {
+  background-color: var(--surface-card) !important;
+}
+.dark .bg-gray-50 {
+  background-color: var(--surface-raised) !important;
+}
+.dark .bg-gray-100 {
+  background-color: #20232f !important;
+}
+.dark .bg-gray-200 {
+  background-color: #272b39 !important;
+}
+/* Legacy arbitrary dark grounds used across dashboards → Aurora surfaces */
+.dark .dark\:bg-\[\#111111\],
+.dark .dark\:bg-\[\#0a0a0a\] {
+  background-color: var(--surface-card) !important;
+}
+.dark .dark\:bg-\[\#050505\] {
+  background-color: var(--surface-page) !important;
+}
+
+/* Text colours */
+.dark .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+.dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+.dark .text-gray-500 {
+  color: #6b7280 !important;
+}
+.dark .text-gray-400 {
+  color: #4b5563 !important;
+}
+
+/* Borders */
+.dark .border-gray-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+.dark .border-gray-300 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+.dark .border-gray-100 {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+.dark .divide-gray-200 > * + * {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+.dark .divide-gray-100 > * + * {
+  border-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Hover states — suppress light hover flashes */
+.dark .hover\:bg-gray-50:hover  { background-color: rgba(255, 255, 255, 0.04) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.dark .hover\:bg-indigo-50:hover { background-color: rgba(99, 102, 241, 0.1) !important; }
+.dark .hover\:bg-blue-50:hover  { background-color: rgba(59, 130, 246, 0.08) !important; }
+.dark .hover\:bg-red-50:hover   { background-color: rgba(239, 68, 68, 0.08) !important; }
+.dark .hover\:bg-green-50:hover { background-color: rgba(34, 197, 94, 0.08) !important; }
+
+/* Active states */
+.dark .active\:bg-gray-100:active  { background-color: rgba(255, 255, 255, 0.07) !important; }
+.dark .active\:bg-gray-200:active  { background-color: rgba(255, 255, 255, 0.09) !important; }
+
+/* Form elements — inputs, selects, textareas — the single biggest "light burst" source */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.dark select,
+.dark textarea {
+  background-color: #1a1a1a !important;
+  color: #e2e8f0 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color-scheme: dark;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #4b5563 !important;
+}
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: rgba(99, 102, 241, 0.6) !important;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+}
+/* Disabled inputs */
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled {
+  background-color: #151515 !important;
+  color: #4b5563 !important;
+  cursor: not-allowed;
+}
+
+/* Shadow neutralisation — white box-shadow looks dirty on dark bg */
+.dark .shadow,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl {
+  box-shadow: none !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   STATUS BADGE DARK OVERRIDES
+   Prevent green-100, blue-100, yellow-100 blowing
+   out in dark mode
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.dark .bg-green-100  { background-color: rgba(34, 197, 94, 0.12) !important; }
+.dark .text-green-800 { color: #86efac !important; }
+.dark .text-green-700 { color: #86efac !important; }
+.dark .text-green-600 { color: #4ade80 !important; }
+
+.dark .bg-blue-100  { background-color: rgba(59, 130, 246, 0.12) !important; }
+.dark .text-blue-800 { color: #93c5fd !important; }
+.dark .text-blue-700 { color: #93c5fd !important; }
+.dark .text-blue-600 { color: #60a5fa !important; }
+
+.dark .bg-blue-50   { background-color: rgba(59, 130, 246, 0.06) !important; }
+.dark .border-blue-200 { border-color: rgba(59, 130, 246, 0.15) !important; }
+.dark .text-blue-900 { color: #bfdbfe !important; }
+
+.dark .bg-yellow-100 { background-color: rgba(234, 179, 8, 0.12) !important; }
+.dark .text-yellow-800 { color: #fde047 !important; }
+.dark .text-yellow-700 { color: #fde047 !important; }
+
+.dark .bg-red-100   { background-color: rgba(239, 68, 68, 0.12) !important; }
+.dark .text-red-800  { color: #fca5a5 !important; }
+.dark .text-red-700  { color: #fca5a5 !important; }
+.dark .text-red-600  { color: #f87171 !important; }
+
+.dark .bg-purple-100 { background-color: rgba(168, 85, 247, 0.12) !important; }
+.dark .text-purple-800 { color: #d8b4fe !important; }
+.dark .text-purple-700 { color: #d8b4fe !important; }
+
+.dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.12) !important; }
+.dark .text-orange-800 { color: #fdba74 !important; }
+
+.dark .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.12) !important; }
+.dark .text-indigo-800 { color: #a5b4fc !important; }
+
+.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.12) !important; }
+.dark .text-amber-600 { color: #fbbf24 !important; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TABLE DARK OVERRIDES
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.dark thead.bg-gray-50,
+.dark thead > tr > th  {
+  background-color: #141414 !important;
+  color: #6b7280 !important;
+}
+.dark tr:hover {
+  background-color: rgba(255, 255, 255, 0.025) !important;
+}
+.dark tbody.bg-white {
+  background-color: transparent !important;
+}
+.dark td, .dark th {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CALCULATOR DARK PATCH
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.dark .bg-gradient-to-br.from-gray-50.to-gray-100 {
+  background: #1e1e1e !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   SCROLLBAR — DARK PREMIUM
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3d3d3d;
+}
+
+/* Pill-shaped horizontal tab bars: still scrollable on overflow, but the
+   scrollbar track is a straight rectangle that clips through the rounded
+   corners, so it's hidden here rather than shown like a normal scrollbar. */
+.scrollbar-hidden {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Mermaid flowchart output: center and scale responsively within its card. */
+.mermaid-svg-wrap svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   FOCUS RING
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+*:focus-visible {
+  outline: 2px solid rgb(var(--accent-rgb));
+  outline-offset: 2px;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   AURORA SIGNAL — REUSABLE SURFACE / ACCENT UTILITIES
+   Token-driven, so both themes resolve from the vars above.
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Glass Panel (card design 03) — frosted translucent surface with an inner
+   sheen and a soft indigo corner glow. Solid `background-color` is a fallback
+   for engines without color-mix; the glow is painted on the element itself
+   (not a pseudo-element) so nothing needs overflow:hidden. */
+.glass-card,
+.surface-card,
+.stat-tile {
+  background-color: var(--surface-card);
+  background:
+    radial-gradient(150px 110px at 100% 0%, rgb(var(--accent-rgb) / 0.14), transparent 70%),
+    color-mix(in srgb, var(--surface-card) 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 14px 34px -16px rgb(15 23 42 / 0.35);
+}
+.stat-tile { border-radius: 1.5rem; }
+.gradient-accent {
+  background-image: var(--grad-accent);
+}
+.text-gradient-accent {
+  background-image: var(--grad-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.stat-tile {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.5rem;
+}
+.tab-pill-active {
+  background-image: var(--grad-accent);
+  color: #fff;
+  box-shadow: 0 10px 24px -8px rgb(var(--accent-rgb) / 0.45);
+}
+.glow-cyan {
+  box-shadow: 0 0 18px var(--glow-cyan);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ANIMATIONS
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes zoomIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+@keyframes slideInUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes slideInDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.animate-in { animation-duration: 200ms; animation-timing-function: cubic-bezier(0.4,0,0.2,1); animation-fill-mode: both; }
+.fade-in       { animation-name: fadeIn; }
+.fade-out      { animation-name: fadeOut; }
+.zoom-in-95    { animation-name: zoomIn; }
+.slide-in-up   { animation-name: slideInUp; }
+.slide-in-down { animation-name: slideInDown; }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   A11Y UTILITIES
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
+}
+.sr-only:focus, .focus\:not-sr-only:focus {
+  position: static; width: auto; height: auto;
+  padding: inherit; margin: inherit; overflow: visible;
+  clip: auto; white-space: normal;
+}
+
+/* ---------------------------------------------------------------------------
+   Google-Docs-style scratchpad editor (contentEditable) content styles.
+   Tailwind's reset strips heading/list styling, so restore it inside .doceditor.
+--------------------------------------------------------------------------- */
+.doceditor { outline: none; }
+.doceditor:empty:before {
+  content: attr(data-placeholder);
+  color: rgb(156 163 175 / 0.7);
+  pointer-events: none;
+}
+.doceditor h1 { font-size: 1.875rem; font-weight: 800; line-height: 1.2; margin: 0.85rem 0 0.5rem; }
+.doceditor h2 { font-size: 1.375rem; font-weight: 700; line-height: 1.25; margin: 0.7rem 0 0.4rem; }
+.doceditor h3 { font-size: 1.125rem; font-weight: 700; margin: 0.6rem 0 0.35rem; }
+.doceditor p  { margin: 0.4rem 0; }
+.doceditor ul { list-style: disc;    padding-left: 1.6rem; margin: 0.4rem 0; }
+.doceditor ol { list-style: decimal; padding-left: 1.6rem; margin: 0.4rem 0; }
+.doceditor li { margin: 0.15rem 0; }
+.doceditor blockquote {
+  border-left: 3px solid rgb(99 102 241 / 0.55);
+  padding-left: 1rem; margin: 0.6rem 0;
+  color: rgb(107 114 128); font-style: italic;
+}
+.doceditor a { color: rgb(79 70 229); text-decoration: underline; }
+.dark .doceditor a { color: rgb(129 140 248); }
+.doceditor pre {
+  background: rgb(0 0 0 / 0.05); border-radius: 0.6rem;
+  padding: 0.75rem 1rem; margin: 0.5rem 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto;
+}
+.dark .doceditor pre { background: rgb(255 255 255 / 0.06); }
+.doceditor code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Format-preserving paste: render tables, images and horizontal rules. */
+.doceditor table { border-collapse: collapse; max-width: 100%; margin: 0.6rem 0; }
+.doceditor th, .doceditor td { border: 1px solid rgb(0 0 0 / 0.18); padding: 0.4rem 0.6rem; vertical-align: top; }
+.dark .doceditor th, .dark .doceditor td { border-color: rgb(255 255 255 / 0.18); }
+.doceditor th { background: rgb(0 0 0 / 0.04); font-weight: 700; }
+.dark .doceditor th { background: rgb(255 255 255 / 0.06); }
+.doceditor img { max-width: 100%; height: auto; border-radius: 0.25rem; margin: 0.35rem 0; }
+.doceditor hr { border: none; border-top: 1px solid rgb(0 0 0 / 0.12); margin: 0.8rem 0; }
+.dark .doceditor hr { border-top-color: rgb(255 255 255 / 0.12); }

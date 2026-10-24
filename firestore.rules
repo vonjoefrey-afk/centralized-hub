@@ -1,0 +1,388 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get user role
+    function getUserRole() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role 
+        : null;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['isCoAdmin']) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isCoAdmin == true));
+    }
+    
+    // Helper function to check if user is team leader
+    function isTeamLeader() {
+      return getUserRole() == 'team_leader';
+    }
+    
+    // Helper function to check if user is team member
+    function isTeamMember() {
+      return getUserRole() == 'team_member';
+    }
+    
+    // Helper function to check if user is Trainer
+    function isTrainer() {
+      return getUserRole() == 'trainer';
+    }
+    
+    // Helper function to check if user is manager (Trainer only)
+    function isManager() {
+      return isTrainer();
+    }
+
+    // Helper function to check if user has SPII cases feature
+    function hasSpiiCasesFeature() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['features']) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.keys().hasAll(['spiiCases']) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.spiiCases == true;
+    }
+
+    // Helper function to check if user has SPII Audit feature
+    function hasSpiiAuditFeature() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['features']) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.keys().hasAll(['spiiAudit']) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.spiiAudit == true;
+    }
+    
+    // Helper function to get user team ID
+    function getUserTeamId() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['teamId']) 
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId 
+        : null;
+    }
+
+    // Helper function to check if user has Create Updates feature
+    function hasCreateUpdatesFeature() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['features']) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.keys().hasAll(['canCreateUpdates']) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.canCreateUpdates == true;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // INTENTIONAL: reads are open to any authenticated user. This is an
+      // internal, all-employee tool where features across roles legitimately
+      // need the full roster (reassignment pickers, team/name lookups). The
+      // sensitive part — privilege-bearing fields (role, teamId, email,
+      // isCoAdmin, features) — stays admin-only via the update rule below.
+      allow read: if isAuthenticated();
+      
+      // Allow creation by anyone (sign up) but role must be team_member by default,
+      // UNLESS an admin pre-provisioned this exact email with this exact role
+      // (manual "Add User"): then the new user may claim that elevated role at
+      // first login. The role is verified against the admin-written invite, so a
+      // user can never grant themselves a role an admin didn't assign.
+      allow create: if isAuthenticated() && request.auth.uid == userId && (
+        (!request.resource.data.keys().hasAll(['role']) || request.resource.data.role == 'team_member')
+        || (
+          request.auth.token.email != null &&
+          exists(/databases/$(database)/documents/provisioned_users/$(request.auth.token.email.lower())) &&
+          get(/databases/$(database)/documents/provisioned_users/$(request.auth.token.email.lower())).data.role == request.resource.data.role &&
+          request.resource.data.get('isCoAdmin', false) == false
+        )
+      );
+      
+      // Allow users to update their own profile, but NOT role, teamId, email, or any
+      // privilege-bearing field (isCoAdmin / features) — those grant admin-equivalent
+      // access via isAdmin() and the hasXFeature() helpers, so only admins may set them.
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'teamId', 'email', 'isCoAdmin', 'features']);
+      
+      // Admin can do anything
+      allow write: if isAdmin();
+      
+      // Team Leader can update teamId for team members (for migration/adding)
+      allow update: if isTeamLeader() &&
+        resource.data.role == 'team_member';
+    }
+
+    // Admin-provisioned invites (manual "Add User"). Doc id is the lowercased
+    // email. Admins manage them; the matching user may read their own invite and
+    // delete it once it is consumed at first login (see users create rule above).
+    match /provisioned_users/{emailId} {
+      allow read, create, update: if isAdmin();
+      allow read, delete: if isAuthenticated() &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == emailId;
+      allow delete: if isAdmin();
+    }
+
+    match /teams/{teamId}/settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() ||
+                    isTrainer() ||
+                    (isAuthenticated() && exists(/databases/$(database)/documents/teams/$(teamId)) && get(/databases/$(database)/documents/teams/$(teamId)).data.teamLeaderId == request.auth.uid);
+    }
+
+    match /settings/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isTeamLeader() || hasSpiiCasesFeature() || hasSpiiAuditFeature();
+    }
+    
+    match /teams/{teamId} {
+      allow create: if isTeamLeader() && request.auth.uid == request.resource.data.teamLeaderId;
+      allow update: if isTeamLeader() && resource.data.teamLeaderId == request.auth.uid;
+      allow update: if isTeamLeader() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'updatedAt']) &&
+        request.resource.data.teamLeaderId == resource.data.teamLeaderId &&
+        request.resource.data.name == resource.data.name &&
+        (request.resource.data.description == resource.data.description || 
+         (!request.resource.data.description && !resource.data.description));
+      allow read: if isAuthenticated();
+      allow read, list, write, delete: if isAdmin();
+    }
+    
+    match /updates/{updateId} {
+      allow create: if ((isTeamLeader() && 
+        exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId)) &&
+        get(/databases/$(database)/documents/teams/$(request.resource.data.teamId)).data.teamLeaderId == request.auth.uid) ||
+        (hasCreateUpdatesFeature() && 
+         request.resource.data.teamId == getUserTeamId() &&
+         exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId)) &&
+         request.auth.uid in get(/databases/$(database)/documents/teams/$(request.resource.data.teamId)).data.members));
+      allow create: if isManager() &&
+        exists(/databases/$(database)/documents/teams/$(request.resource.data.teamId));
+      allow create: if isTrainer();
+      // Admins can post updates too (used for the bug-fix broadcast from the
+      // User Feedback tab, which goes out on the shared 'trainer-updates' channel).
+      allow create: if isAdmin();
+      allow read: if isAuthenticated() && (
+        resource.data.teamId == 'trainer-updates' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId) ||
+        (exists(/databases/$(database)/documents/teams/$(resource.data.teamId)) && 
+         get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.teamLeaderId == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/teams/$(resource.data.teamId)) && 
+         request.auth.uid in get(/databases/$(database)/documents/teams/$(resource.data.teamId)).data.members)
+      );
+      allow read: if isAdmin() || isTrainer() || isManager();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.createdBy == request.auth.uid);
+    }
+    
+    match /acknowledgments/{ackId} {
+      allow create: if isAuthenticated() && 
+        request.auth.uid == request.resource.data.userId;
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.get('updateCreatedBy', '') == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/updates/$(resource.data.updateId)) && 
+         get(/databases/$(database)/documents/updates/$(resource.data.updateId)).data.createdBy == request.auth.uid) ||
+        isAdmin() || isManager()
+      );
+      allow read: if isTeamLeader() && 
+        exists(/databases/$(database)/documents/updates/$(resource.data.updateId)) &&
+        exists(/databases/$(database)/documents/teams/$(get(/databases/$(database)/documents/updates/$(resource.data.updateId)).data.teamId)) &&
+        get(/databases/$(database)/documents/teams/$(get(/databases/$(database)/documents/updates/$(resource.data.updateId)).data.teamId)).data.teamLeaderId == request.auth.uid;
+      allow read, list: if isAdmin();
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && (
+        isAdmin() || 
+        isManager() ||
+        (resource.data.get('updateCreatedBy', '') == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/updates/$(resource.data.updateId)) && (
+          get(/databases/$(database)/documents/updates/$(resource.data.updateId)).data.createdBy == request.auth.uid ||
+          (isTeamLeader() && get(/databases/$(database)/documents/updates/$(resource.data.updateId)).data.teamId == getUserTeamId())
+        ))
+      );
+    }
+    
+    match /migrations/{migrationId} {
+      allow read: if isTeamLeader() && 
+        resource.data.currentTeamLeaderId == request.auth.uid;
+      allow read: if isTeamLeader() && 
+        resource.data.requestingLeaderId == request.auth.uid;
+      allow create: if isTeamLeader() && 
+        request.resource.data.requestingLeaderId == request.auth.uid;
+      allow update: if isTeamLeader() && 
+        resource.data.currentTeamLeaderId == request.auth.uid;
+      allow delete: if isTeamLeader() && 
+        resource.data.requestingLeaderId == request.auth.uid;
+      allow read, list, delete: if isAdmin();
+    }
+    
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.get('updateCreatedBy', '') == request.auth.uid) ||
+        ('updateId' in resource.data && 
+         exists(/databases/$(database)/documents/updates/$(resource.data.updateId)) &&
+         get(/databases/$(database)/documents/updates/$(resource.data.updateId)).data.createdBy == request.auth.uid) ||
+        isAdmin() || isManager()
+      );
+      allow create: if isAuthenticated() && 
+        (
+          request.resource.data.userId == request.auth.uid || 
+          (isTeamLeader() || isManager() || isAdmin() || hasCreateUpdatesFeature()) &&
+          request.resource.data.keys().hasAll(['userId', 'type', 'title', 'message', 'createdAt'])
+        );
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && (
+        isAdmin() ||
+        (resource.data.get('updateCreatedBy', '') == request.auth.uid) ||
+        ('updateId' in resource.data && 
+         exists(/databases/$(database)/documents/updates/$(resource.data.updateId)) &&
+         get(/databases/$(database)/documents/updates/$(request.resource.data.updateId)).data.createdBy == request.auth.uid)
+      );
+    }
+    
+    match /templates/{templateId} {
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow read: if isAdmin();
+    }
+
+    // Pending template shares: sender proposes, recipient must accept before
+    // anything lands in their own templates collection.
+    match /template_shares/{shareId} {
+      allow create: if isAuthenticated() && request.resource.data.fromUid == request.auth.uid;
+      allow read, list: if isAuthenticated() &&
+        (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() &&
+        (resource.data.toUid == request.auth.uid || resource.data.fromUid == request.auth.uid || isAdmin());
+    }
+
+    match /notes/{noteId} {
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      allow read: if isAdmin();
+    }
+
+    match /scratchpads/{userId} {
+      allow read, write: if isAuthenticated() &&
+        request.auth.uid == userId;
+      allow read: if isAdmin();
+
+      // Google-Docs-style multi-document notes (owner-only; admin read for audit).
+      match /documents/{docId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+        allow read: if isAdmin();
+      }
+    }
+
+    match /spii_cases/{caseId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin() || isTrainer() || isTeamLeader() || hasSpiiCasesFeature() ||
+        (!('teamId' in resource.data) && resource.data.userId == request.auth.uid)
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin() || isTrainer() ||
+        (isTeamLeader() && resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId)
+      );
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin() || isTrainer() ||
+        (isTeamLeader() && resource.data.teamId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId)
+      );
+    }
+
+    match /tracked_cases/{caseId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // INTENTIONAL: reads are org-wide. Case analytics are shown across roles
+      // by product decision; only the owner may update/delete their own cases.
+      allow read, list: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /password_resets/{resetId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // SPII Audit Logs collection
+    match /spii_audit_logs/{logId} {
+      // Any authenticated user can create an audit log (triggered by real-time detection)
+      allow create: if isAuthenticated();
+      
+      // Only authorized users can read/list/manage logs
+      allow read, list: if isAdmin() || isTeamLeader() || hasSpiiAuditFeature();
+      
+      // Only admins can delete logs for permanent record preservation
+      allow delete: if isAdmin();
+      
+      // Update allowed for marking as notified or assigning
+      allow update: if isAdmin() || isTeamLeader() || hasSpiiAuditFeature();
+    }
+
+    // Feedback collection (bug reports & UAT feedback from the floating feedback button)
+    match /feedback/{feedbackId} {
+      // Any authenticated user can submit feedback tagged as their own
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+
+      // Only admins can view, triage, or manage submitted feedback
+      allow read, list, update, delete: if isAdmin();
+    }
+
+    // App Utilization Monitor — per-user live activity state (one doc per user).
+    // Each user writes only their own doc; only admins can read the whole set.
+    match /user_activity/{uid} {
+      allow read, list: if isAdmin();
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow create, update: if isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // App Utilization Monitor — append-only audit trail of activity events.
+    // Users may only append events tagged as their own; only admins can read.
+    match /activity_audit/{eventId} {
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow read, list: if isAdmin();
+    }
+
+    // Template live sessions — ties template copies to a case ID.
+    // Agents read/write only their own sessions (no deletes, uid can't change);
+    // admins can read all for the Utilization Monitor. The scheduled sweeper
+    // uses the Admin SDK and bypasses these rules.
+    match /live_sessions/{sessionId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow read, list: if isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.caseId is string
+        && request.resource.data.caseId.size() > 0
+        && request.resource.data.caseId.size() <= 64
+        && request.resource.data.channel in ['chat', 'email'];
+      allow update: if isAuthenticated()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.caseId == resource.data.caseId
+        && request.resource.data.channel in ['chat', 'email'];
+    }
+  }
+}

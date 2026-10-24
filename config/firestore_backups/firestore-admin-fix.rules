@@ -1,0 +1,66 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      // Allow users to read/write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow creation during signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow admins to read all user documents
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Teams collection
+    match /teams/{teamId} {
+      // Allow team leaders to create teams
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.teamLeaderId;
+      
+      // Allow team leaders to update their own teams
+      allow update: if request.auth != null && 
+        resource.data.teamLeaderId == request.auth.uid;
+      
+      // Allow reading teams where user is the leader or a member
+      allow read: if request.auth != null && 
+        (resource.data.teamLeaderId == request.auth.uid || 
+         request.auth.uid in resource.data.members);
+    }
+    
+    // Updates collection
+    match /updates/{updateId} {
+      // Allow creating updates (we'll check team leadership in the app)
+      allow create: if request.auth != null;
+      
+      // Allow reading updates (we'll check team membership in the app)
+      allow read: if request.auth != null;
+    }
+    
+    // Acknowledgments collection
+    match /acknowledgments/{ackId} {
+      // Allow creating acknowledgments for authenticated users
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+      
+      // Allow reading own acknowledgments
+      allow read: if request.auth != null && 
+        resource.data.userId == request.auth.uid;
+    }
+    
+    // Migrations collection
+    match /migrations/{migrationId} {
+      // Allow creating migration requests
+      allow create: if request.auth != null;
+      
+      // Allow reading migrations for team leaders
+      allow read: if request.auth != null;
+      
+      // Allow updating migration status
+      allow update: if request.auth != null;
+    }
+  }
+}

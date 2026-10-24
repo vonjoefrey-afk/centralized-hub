@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - ALLOW TEAM LEADERS TO UPDATE USER TEAM ASSIGNMENTS
+    match /users/{userId} {
+      // Allow users to read/write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow creation during signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow ALL authenticated users to read all user documents
+      allow read: if request.auth != null;
+      
+      // Allow team leaders to update teamId field of other users
+      allow update: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'team_leader' &&
+        request.resource.data.keys().hasAll(['teamId', 'updatedAt']) &&
+        request.resource.data.keys().hasOnly(['teamId', 'updatedAt', 'uid', 'email', 'displayName', 'role', 'createdAt']);
+    }
+    
+    // Teams collection
+    match /teams/{teamId} {
+      // Allow authenticated users to read teams
+      allow read: if request.auth != null;
+      
+      // Allow team leaders to create teams
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.teamLeaderId;
+      
+      // Allow team leaders to update their own teams
+      allow update: if request.auth != null && 
+        resource.data.teamLeaderId == request.auth.uid;
+    }
+    
+    // Updates collection
+    match /updates/{updateId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Acknowledgments collection
+    match /acknowledgments/{ackId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Migrations collection
+    match /migrations/{migrationId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

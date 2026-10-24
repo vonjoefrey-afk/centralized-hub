@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      // Allow users to read/write their own document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow creation during signup
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow admins and team leaders to read all user documents
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'team_leader'];
+    }
+    
+    // Teams collection - SIMPLIFIED RULES FOR DEBUGGING
+    match /teams/{teamId} {
+      // Allow authenticated users to read teams (for debugging)
+      allow read: if request.auth != null;
+      
+      // Allow team leaders to create teams
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.teamLeaderId;
+      
+      // Allow team leaders to update their own teams
+      allow update: if request.auth != null && 
+        resource.data.teamLeaderId == request.auth.uid;
+    }
+    
+    // Updates collection
+    match /updates/{updateId} {
+      // Allow creating updates
+      allow create: if request.auth != null;
+      
+      // Allow reading updates
+      allow read: if request.auth != null;
+      
+      // Allow updating updates
+      allow update: if request.auth != null;
+    }
+    
+    // Acknowledgments collection
+    match /acknowledgments/{ackId} {
+      // Allow creating acknowledgments
+      allow create: if request.auth != null;
+      
+      // Allow reading acknowledgments
+      allow read: if request.auth != null;
+      
+      // Allow updating acknowledgments
+      allow update: if request.auth != null;
+    }
+    
+    // Migrations collection
+    match /migrations/{migrationId} {
+      // Allow creating migration requests
+      allow create: if request.auth != null;
+      
+      // Allow reading migration requests
+      allow read: if request.auth != null;
+      
+      // Allow updating migration requests
+      allow update: if request.auth != null;
+    }
+  }
+}

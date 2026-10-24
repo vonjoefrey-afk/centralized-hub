@@ -1,0 +1,88 @@
+# Production deploy — runs ONLY after an approved PR is merged to `main`
+# (or when an authorized person triggers it manually). No local `firebase deploy`
+# is needed; all authorized changes ship through GitHub.
+#
+# ── One-time setup (repo Settings) ──────────────────────────────────────────
+# 1) Settings → Secrets and variables → Actions → add these repository secrets:
+#      FIREBASE_SERVICE_ACCOUNT   (the full JSON of a GCP service account key — see HANDOVER.md for roles)
+#      REACT_APP_FIREBASE_API_KEY
+#      REACT_APP_FIREBASE_AUTH_DOMAIN
+#      REACT_APP_FIREBASE_PROJECT_ID
+#      REACT_APP_FIREBASE_STORAGE_BUCKET
+#      REACT_APP_FIREBASE_MESSAGING_SENDER_ID
+#      REACT_APP_FIREBASE_APP_ID
+#      REACT_APP_APPS_SCRIPT_URL          (optional; blank is fine)
+# 2) Settings → Environments → create "production" → add Required reviewers
+#      (the authorized personnel who approve each go-live).
+# 3) Settings → Branches → add a branch protection rule for `main`:
+#      require a pull request, require ≥1 approval, and disallow direct pushes.
+# ────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to Firebase (production)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # lets an authorized person deploy on demand from the Actions tab
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # The "production" environment adds the second gate: a required reviewer must
+    # approve before this job runs, so a merge alone never auto-ships to prod.
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install functions dependencies
+        run: npm --prefix functions ci
+
+      - name: Write client .env from secrets
+        env:
+          REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
+          REACT_APP_FIREBASE_AUTH_DOMAIN: ${{ secrets.REACT_APP_FIREBASE_AUTH_DOMAIN }}
+          REACT_APP_FIREBASE_PROJECT_ID: ${{ secrets.REACT_APP_FIREBASE_PROJECT_ID }}
+          REACT_APP_FIREBASE_STORAGE_BUCKET: ${{ secrets.REACT_APP_FIREBASE_STORAGE_BUCKET }}
+          REACT_APP_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.REACT_APP_FIREBASE_MESSAGING_SENDER_ID }}
+          REACT_APP_FIREBASE_APP_ID: ${{ secrets.REACT_APP_FIREBASE_APP_ID }}
+          REACT_APP_APPS_SCRIPT_URL: ${{ secrets.REACT_APP_APPS_SCRIPT_URL }}
+        run: |
+          {
+            echo "REACT_APP_FIREBASE_API_KEY=$REACT_APP_FIREBASE_API_KEY"
+            echo "REACT_APP_FIREBASE_AUTH_DOMAIN=$REACT_APP_FIREBASE_AUTH_DOMAIN"
+            echo "REACT_APP_FIREBASE_PROJECT_ID=$REACT_APP_FIREBASE_PROJECT_ID"
+            echo "REACT_APP_FIREBASE_STORAGE_BUCKET=$REACT_APP_FIREBASE_STORAGE_BUCKET"
+            echo "REACT_APP_FIREBASE_MESSAGING_SENDER_ID=$REACT_APP_FIREBASE_MESSAGING_SENDER_ID"
+            echo "REACT_APP_FIREBASE_APP_ID=$REACT_APP_FIREBASE_APP_ID"
+            echo "REACT_APP_APPS_SCRIPT_URL=$REACT_APP_APPS_SCRIPT_URL"
+          } > .env
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to Firebase (hosting + functions + rules)
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@13 deploy \
+            --only hosting,functions,firestore:rules \
+            --project centralized-gcp \
+            --non-interactive \
+            --force
+          rm -f "$RUNNER_TEMP/sa.json"

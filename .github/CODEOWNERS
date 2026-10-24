@@ -1,0 +1,10 @@
+# Code owners — GitHub auto-requests their review on every pull request.
+# Combine with branch protection ("Require review from Code Owners") so changes
+# can't merge without an authorized person's approval.
+#
+# These are the authorized reviewer(s); add more handles separated by spaces.
+# Add path-specific lines above the catch-all to route areas to experts.
+# NOTE: every owner here must have write access to the repo (be a collaborator),
+# or GitHub ignores them as a reviewer.
+
+*       @vonjoefrey-afk @vjel211

@@ -21,8 +21,39 @@
  */
 
 import { initializeApp } from 'firebase/app';
+import { logger } from '../utils/logger';
+
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+
+/**
+ * Validate that all required environment variables are present
+ * This prevents runtime errors and provides clear error messages during development
+ */
+const requiredEnvVars = [
+  'REACT_APP_FIREBASE_API_KEY',
+  'REACT_APP_FIREBASE_AUTH_DOMAIN',
+  'REACT_APP_FIREBASE_PROJECT_ID',
+  'REACT_APP_FIREBASE_STORAGE_BUCKET',
+  'REACT_APP_FIREBASE_MESSAGING_SENDER_ID',
+  'REACT_APP_FIREBASE_APP_ID'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  const errorMessage = `Missing required environment variables:\n${missingEnvVars.join('\n')}\n\nPlease create a .env file in the root directory with these variables. See .env.example for reference.`;
+
+  // In development, throw error to catch during startup
+  if (import.meta.env.MODE === 'development') {
+    throw new Error(errorMessage);
+  } else {
+    // In production, log error but don't crash immediately
+    logger.error(errorMessage);
+    logger.error('Application may not function correctly without these variables.');
+  }
+}
 
 /**
  * Firebase Configuration Object
@@ -40,12 +71,12 @@ import { getFirestore } from 'firebase/firestore';
  * SECURITY: Now using environment variables for better security!
  */
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID
+  apiKey: import.meta.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: import.meta.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.REACT_APP_FIREBASE_APP_ID
 };
 
 /**
@@ -85,6 +116,13 @@ export const auth = getAuth(app);
  * - Notifications
  */
 export const db = getFirestore(app);
+
+/**
+ * Cloud Functions Service
+ * Provides access to serverless functions deployed to Firebase.
+ * Using region asia-southeast1 to match our backend deployment.
+ */
+export const functions = getFunctions(app, 'asia-southeast1');
 
 /**
  * Default Export
