@@ -479,28 +479,42 @@ export const getScratchpadDocuments = async (userId) => {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-/** Create a new document; returns its generated id. */
-export const createScratchpadDocument = async (userId, { title, content } = {}) => {
+/** Create a new document; returns its generated id. `parentId`/`order` place it in the tree. */
+export const createScratchpadDocument = async (userId, { title, content, parentId = null, order = 0 } = {}) => {
   const colRef = collection(db, 'scratchpads', userId, 'documents');
   const ref = await addDoc(colRef, {
     title: title || 'Untitled document',
     content: content || '',
+    parentId: parentId ?? null,
+    order,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
   return ref.id;
 };
 
-/** Patch a document's title and/or content; always bumps updatedAt. */
-export const updateScratchpadDocument = async (userId, docId, data) => {
+/**
+ * Patch a document. By default bumps `updatedAt` (a real edit); pass
+ * `touch: false` for structural-only changes (move/reorder/collapse) so the
+ * "last edited" time isn't disturbed.
+ */
+export const updateScratchpadDocument = async (userId, docId, data, { touch = true } = {}) => {
   const ref = doc(db, 'scratchpads', userId, 'documents', docId);
-  await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+  await updateDoc(ref, touch ? { ...data, updatedAt: serverTimestamp() } : { ...data });
 };
 
 /** Permanently delete a document. */
 export const deleteScratchpadDocument = async (userId, docId) => {
   const ref = doc(db, 'scratchpads', userId, 'documents', docId);
   await deleteDoc(ref);
+};
+
+/** Permanently delete several documents in one batch (e.g. a tab and its sub-tabs). */
+export const deleteScratchpadDocuments = async (userId, docIds = []) => {
+  if (!docIds.length) return;
+  const batch = writeBatch(db);
+  for (const id of docIds) batch.delete(doc(db, 'scratchpads', userId, 'documents', id));
+  await batch.commit();
 };
 
 /** Flag the legacy single-scratchpad as migrated so we only import it once. */

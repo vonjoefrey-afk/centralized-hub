@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  PlusIcon, DocumentTextIcon, EllipsisVerticalIcon,
-  TrashIcon, DocumentDuplicateIcon, PencilIcon, Bars3Icon, XMarkIcon,
+  PlusIcon, DocumentTextIcon, Bars3Icon, XMarkIcon,
   LinkIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon,
   ArrowUpTrayIcon, ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
@@ -9,7 +8,8 @@ import { logger } from '../../utils/logger';
 import {
   getUserScratchpad, logSpiiAudit,
   getScratchpadDocuments, createScratchpadDocument,
-  updateScratchpadDocument, deleteScratchpadDocument, markScratchpadMigrated,
+  updateScratchpadDocument, deleteScratchpadDocument, deleteScratchpadDocuments,
+  markScratchpadMigrated,
 } from '../../firebase/firestore';
 import { detectSPII } from '../../utils/spiiDetector';
 import { logActivity } from '../../services/activity';
@@ -17,6 +17,8 @@ import { showError, showSuccess } from '../../utils/toast';
 import { ConfirmModal } from '../ui';
 import { fileToDocument, sanitizeRichHtml, ACCEPTED_IMPORT_TYPES } from '../../utils/importDoc';
 import { isDrivePickerConfigured, pickAndImportGoogleDoc } from '../../utils/googleDrivePicker';
+import DocumentTree from './scratchpad/DocumentTreeView';
+import { getDescendantIds } from './scratchpad/documentTree';
 
 const SAVE_DEBOUNCE_MS = 900;
 
@@ -27,6 +29,7 @@ const defaultApi = {
   create: createScratchpadDocument,
   update: updateScratchpadDocument,
   remove: deleteScratchpadDocument,
+  removeMany: deleteScratchpadDocuments,
   legacy: getUserScratchpad,
   markMigrated: markScratchpadMigrated,
 };
@@ -105,6 +108,7 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
   const [menuOpenId, setMenuOpenId] = useState(null);      // per-item kebab menu
   const [renamingId, setRenamingId] = useState(null);      // inline rename
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set()); // tabs whose sub-tabs are hidden
   const [counts, setCounts] = useState({ words: 0, chars: 0 });
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -137,6 +141,7 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
           }
         }
         setDocuments(docs);
+        setCollapsedIds(new Set(docs.filter((d) => d.collapsed).map((d) => d.id)));
         setActiveId(docs[0]?.id || null);
       } catch (err) {
         logger.error('Failed to load documents:', err);
@@ -255,11 +260,59 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
     setMenuOpenId(null);
   };
 
+  // An order value that sorts a new doc first among its siblings.
+  const firstOrder = (parentId) => {
+    const sibs = documentsRef.current.filter((d) => (d.parentId ?? null) === (parentId ?? null));
+    const min = sibs.reduce((m, d) => Math.min(m, typeof d.order === 'number' ? d.order : 0), 0);
+    return min - 1;
+  };
+
+  // Persist a drag-and-drop move: re-parent / reorder without bumping edit times.
+  const handleMove = async (updates, newDocs) => {
+    setDocuments(newDocs);
+    try {
+      await Promise.all(
+        updates.map((u) => api.update(user.uid, u.id, { parentId: u.parentId, order: u.order }, { touch: false }))
+      );
+    } catch (err) {
+      logger.error('Failed to save tab arrangement:', err);
+      showError('Could not save the new arrangement');
+    }
+  };
+
+  const toggleCollapse = (id) => {
+    const next = new Set(collapsedIds);
+    const collapsed = !next.has(id);
+    if (collapsed) next.add(id); else next.delete(id);
+    setCollapsedIds(next);
+    api.update(user.uid, id, { collapsed }, { touch: false }).catch((err) => logger.error('Failed to save collapse state:', err));
+  };
+
+  const handleAddSubtab = async (parentId) => {
+    setMenuOpenId(null);
+    try {
+      flushNow();
+      const order = firstOrder(parentId);
+      const id = await api.create(user.uid, { title: 'Untitled document', content: '', parentId, order });
+      setDocuments((prev) => [{ id, title: 'Untitled document', content: '', parentId, order, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
+      // make sure the parent is expanded so the new sub-tab is visible
+      if (collapsedIds.has(parentId)) toggleCollapse(parentId);
+      setActiveId(id);
+      setSidebarOpen(false);
+      logActivity(user, { eventType: 'note_created', action: 'Created a sub-tab', targetId: id });
+      setTimeout(() => { setRenamingId(id); }, 60);
+    } catch (err) {
+      logger.error('Failed to create sub-tab:', err);
+      showError('Could not create sub-tab');
+    }
+  };
+
   const handleNew = async () => {
     try {
       flushNow();
-      const id = await api.create(user.uid, { title: 'Untitled document', content: '' });
-      setDocuments((prev) => [{ id, title: 'Untitled document', content: '', createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
+      const order = firstOrder(null);
+      const id = await api.create(user.uid, { title: 'Untitled document', content: '', parentId: null, order });
+      setDocuments((prev) => [{ id, title: 'Untitled document', content: '', parentId: null, order, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
       setActiveId(id);
       setSidebarOpen(false);
       logActivity(user, { eventType: 'note_created', action: 'Created a document', targetId: id });
@@ -273,8 +326,9 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
   // Create a new document from imported { title, content } and open it.
   const addImportedDoc = async ({ title, content }, source) => {
     flushNow();
-    const id = await api.create(user.uid, { title: title || 'Imported document', content: content || '' });
-    setDocuments((prev) => [{ id, title: title || 'Imported document', content: content || '', createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
+    const order = firstOrder(null);
+    const id = await api.create(user.uid, { title: title || 'Imported document', content: content || '', parentId: null, order });
+    setDocuments((prev) => [{ id, title: title || 'Imported document', content: content || '', parentId: null, order, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
     setActiveId(id);
     setSidebarOpen(false);
     logActivity(user, { eventType: 'note_imported', action: `Imported "${title}" (${source})`, targetId: id });
@@ -314,12 +368,16 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
     }
   };
 
-  const handleDuplicate = async (src) => {
+  const handleDuplicate = async (id0) => {
     setMenuOpenId(null);
+    const src = documentsRef.current.find((d) => d.id === id0);
+    if (!src) return;
     try {
       const title = `Copy of ${src.title}`;
-      const id = await api.create(user.uid, { title, content: src.content });
-      setDocuments((prev) => [{ id, title, content: src.content, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
+      const parentId = src.parentId ?? null;
+      const order = (typeof src.order === 'number' ? src.order : 0) + 0.5; // place right after the original
+      const id = await api.create(user.uid, { title, content: src.content, parentId, order });
+      setDocuments((prev) => [{ id, title, content: src.content, parentId, order, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
       setActiveId(id);
       logActivity(user, { eventType: 'note_created', action: `Duplicated "${src.title}"`, targetId: id });
     } catch (err) {
@@ -332,11 +390,21 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
     const target = confirmDelete;
     if (!target) return;
     try {
-      await api.remove(user.uid, target.id);
-      const remaining = documentsRef.current.filter((d) => d.id !== target.id);
+      const descendantIds = getDescendantIds(documentsRef.current, target.id);
+      const idsToDelete = new Set([target.id, ...descendantIds]);
+      if (idsToDelete.size > 1 && api.removeMany) {
+        await api.removeMany(user.uid, [...idsToDelete]);
+      } else {
+        await api.remove(user.uid, target.id);
+      }
+      const remaining = documentsRef.current.filter((d) => !idsToDelete.has(d.id));
       setDocuments(remaining);
-      if (activeIdRef.current === target.id) setActiveId(remaining[0]?.id || null);
-      logActivity(user, { eventType: 'note_deleted', action: `Deleted "${target.title}"`, targetId: target.id });
+      if (idsToDelete.has(activeIdRef.current)) setActiveId(remaining[0]?.id || null);
+      logActivity(user, {
+        eventType: 'note_deleted',
+        action: `Deleted "${target.title}"${idsToDelete.size > 1 ? ` and ${idsToDelete.size - 1} sub-tab(s)` : ''}`,
+        targetId: target.id,
+      });
     } catch (err) {
       logger.error('Failed to delete document:', err);
       showError('Could not delete document');
@@ -410,60 +478,24 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
         {documents.length === 0 ? (
           <p className="text-center text-xs text-gray-400 py-8 px-3">No documents yet.</p>
         ) : (
-          documents.map((d) => {
-            const active = d.id === activeId;
-            return (
-              <div
-                key={d.id}
-                onClick={() => selectDoc(d.id)}
-                className={`group relative flex items-center gap-3 pl-3 pr-2 py-2.5 rounded-full cursor-pointer mb-0.5 transition-colors ${
-                  active ? 'bg-[#d3e3fd] dark:bg-indigo-500/20' : 'hover:bg-gray-100 dark:hover:bg-white/5'
-                }`}
-              >
-                <DocumentTextIcon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-blue-700 dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'}`} />
-                {renamingId === d.id ? (
-                  <input
-                    autoFocus
-                    value={d.title}
-                    onChange={(e) => setTitle(d.id, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    onFocus={(e) => e.target.select()}
-                    onBlur={commitRename}
-                    onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); }}
-                    className="flex-1 min-w-0 bg-white dark:bg-black/30 rounded-md px-1.5 py-0.5 text-sm font-semibold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                  />
-                ) : (
-                  <span className={`flex-1 min-w-0 truncate text-sm font-semibold ${active ? 'text-blue-800 dark:text-indigo-200' : 'text-gray-800 dark:text-gray-200'}`}>
-                    {d.title || 'Untitled document'}
-                  </span>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === d.id ? null : d.id); }}
-                  aria-label="Document options"
-                  className={`p-1 rounded-full text-gray-500 hover:bg-black/5 dark:hover:bg-white/10 transition-opacity ${active || menuOpenId === d.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                >
-                  <EllipsisVerticalIcon className="w-4 h-4" />
-                </button>
-
-                {menuOpenId === d.id && (
-                  <div
-                    className="absolute right-2 top-11 z-20 w-44 rounded-xl bg-white dark:bg-[#1c1f2a] border border-gray-200 dark:border-white/10 shadow-xl py-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button onClick={() => { setMenuOpenId(null); setActiveId(d.id); setRenamingId(d.id); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5">
-                      <PencilIcon className="w-4 h-4" /> Rename
-                    </button>
-                    <button onClick={() => handleDuplicate(d)} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5">
-                      <DocumentDuplicateIcon className="w-4 h-4" /> Duplicate
-                    </button>
-                    <button onClick={() => { setMenuOpenId(null); setConfirmDelete(d); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">
-                      <TrashIcon className="w-4 h-4" /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })
+          <DocumentTree
+            documents={documents}
+            activeId={activeId}
+            collapsedIds={collapsedIds}
+            renamingId={renamingId}
+            menuOpenId={menuOpenId}
+            titles={Object.fromEntries(documents.map((d) => [d.id, d.title]))}
+            onSelect={selectDoc}
+            onToggleCollapse={toggleCollapse}
+            onMenuToggle={(id) => setMenuOpenId(menuOpenId === id ? null : id)}
+            onMove={handleMove}
+            onRename={(id) => { setMenuOpenId(null); setActiveId(id); setRenamingId(id); }}
+            onDuplicate={handleDuplicate}
+            onDelete={(id) => { setMenuOpenId(null); setConfirmDelete(documentsRef.current.find((d) => d.id === id) || null); }}
+            onAddSubtab={handleAddSubtab}
+            onTitleChange={setTitle}
+            onCommitRename={commitRename}
+          />
         )}
       </div>
     </>
@@ -588,7 +620,14 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
         onClose={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
         title="Delete document"
-        message={confirmDelete ? `"${confirmDelete.title || 'Untitled document'}" will be permanently deleted. This cannot be undone.` : ''}
+        message={confirmDelete
+          ? (() => {
+              const subCount = getDescendantIds(documentsRef.current, confirmDelete.id).length;
+              const base = `"${confirmDelete.title || 'Untitled document'}" will be permanently deleted.`;
+              const subs = subCount > 0 ? ` Its ${subCount} sub-tab${subCount > 1 ? 's' : ''} will also be deleted.` : '';
+              return `${base}${subs} This cannot be undone.`;
+            })()
+          : ''}
         confirmText="Delete"
         type="danger"
       />
