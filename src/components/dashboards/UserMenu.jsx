@@ -5,14 +5,11 @@ import {
     Cog6ToothIcon,
     ArrowRightStartOnRectangleIcon,
     ArrowPathIcon,
-    CloudArrowUpIcon,
     ShieldExclamationIcon,
     ArrowUturnLeftIcon,
     SunIcon,
     MoonIcon,
 } from '@heroicons/react/24/outline';
-import { linkGoogleAccount } from '../../firebase/auth';
-import { showSuccess, showError } from '../../utils/toast';
 import { useTheme } from '../../contexts/ThemeContext';
 
 /* ─── gradient seed from first letter ─── */
@@ -125,27 +122,6 @@ const UserMenu = ({ user, onSignOut, onChangePassword, onRefresh }) => {
                                     onClick={() => { setIsOpen(false); onRefresh(); }}
                                 />
                             )}
-
-                            {/* Migrate to SSO */}
-                            {user?.email?.toLowerCase().endsWith('@google.com') &&
-                                !user?.ssoMigrated &&
-                                !user?.providerData?.some(p => p.providerId === 'google.com') && (
-                                    <MenuItem
-                                        icon={<CloudArrowUpIcon className="h-4 w-4" />}
-                                        iconColor="text-blue-500"
-                                        label="Migrate to Google SSO"
-                                        textColor="text-blue-600 dark:text-blue-400"
-                                        onClick={async () => {
-                                            setIsOpen(false);
-                                            try {
-                                                const result = await linkGoogleAccount();
-                                                if (result.success) showSuccess('Successfully migrated to SSO!');
-                                            } catch (error) {
-                                                showError(error.message || 'Failed to migrate to SSO');
-                                            }
-                                        }}
-                                    />
-                                )}
 
                             {/* Co-Admin switcher */}
                             {user?.isCoAdmin && user?.role !== 'admin' && (

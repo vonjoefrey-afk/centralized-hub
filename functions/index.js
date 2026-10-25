@@ -24,10 +24,6 @@ exports.resetUserPassword = functions.region("asia-southeast1")
 exports.deleteUserFromAuth = functions.region("asia-southeast1")
     .https.onRequest(authController.deleteUserFromAuth);
 
-// 2.5. Update User Auth Email
-exports.updateUserAuthEmail = functions.region("asia-southeast1")
-    .https.onRequest(authController.updateUserAuthEmail);
-
 // 4. SPII Google Chat Integrations
 exports.manualSpiiChatFollowUp = functions.region("asia-southeast1")
     .https.onCall(spiiController.manualSpiiChatFollowUp);
