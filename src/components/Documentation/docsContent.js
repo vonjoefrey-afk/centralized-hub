@@ -352,11 +352,11 @@ export const DOCS = [
       },
       {
         id: 'updates-cleanup',
-        name: 'Updates Management & Cleanup',
+        name: 'Updates: Broadcast, Management & Cleanup',
         problem:
           'Old or test updates pile up and clutter every dashboard, and there was no admin surface to reach and remove them in bulk.',
         howItWorks:
-          'The Updates tab lists every update across all teams/channels in real time. Admins can delete a single update, tick several and "Delete Selected", or "Delete All" — each with a confirmation that spells out the consequences. Every deletion runs the full cascade (removes the update, its acknowledgments, and related notifications, and notifies affected members). Delete permission is admin-only, enforced by Firestore Security Rules.',
+          'The Updates tab lists every update across all teams/channels in real time. "Create Update" opens the same composer the Trainer dashboard uses (title, content, optional deadline, live preview, and an optional list of team members/leaders to exclude) and broadcasts on the shared channel every signed-in user reads, so an admin can announce changes org-wide; it appears in the list immediately and is recorded in the activity trail. Admins can also delete a single update, tick several and "Delete Selected", or "Delete All" — each with a confirmation that spells out the consequences. Every deletion runs the full cascade (removes the update, its acknowledgments, and related notifications, and notifies affected members). Delete permission is admin-only, enforced by Firestore Security Rules.',
         solution:
           'Admins can keep the platform tidy — clearing unnecessary updates one-by-one, in batches, or all at once — so members see a clean, relevant list.',
       },

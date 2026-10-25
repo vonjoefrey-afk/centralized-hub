@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { signOutUser, onAuthStateChange, resetUserPassword, deleteUserFromAuth } from '../../firebase/auth';
 import { getAllTeams, addUserToTeam, getTeam, adminMoveUserToTeam } from '../../services/teams';
 import { getAllUsers, updateUserRole, getPendingTeamLeaders, approveTeamLeader, rejectTeamLeader, deleteUserCompletely, updateUserFeatures, updateUserProfile, createProvisionedUser, getProvisionedUsers, deleteProvisionedUser } from '../../services/users';
-import { getUpdateAcknowledgmentBreakdown, deleteUpdates } from '../../services/updates';
+import { getUpdateAcknowledgmentBreakdown, deleteUpdates, createUpdate } from '../../services/updates';
 import { USER_ROLES } from '../../firebase/auth';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -14,9 +14,10 @@ import { showSuccess, showError } from '../../utils/toast';
 import { logger } from '../../utils/logger';
 import SpiiVisualDashboardTab from './SpiiVisualDashboardTab';
 import MetricAnalyticsTab from './MetricAnalyticsTab';
-import { UserGroupIcon, ShieldCheckIcon, UsersIcon, UserIcon, BriefcaseIcon, CheckCircleIcon, ExclamationTriangleIcon, ArrowsRightLeftIcon, TableCellsIcon, PencilSquareIcon, BellIcon, ChevronRightIcon, FunnelIcon, XMarkIcon, UserPlusIcon, ClockIcon, TrashIcon as TrashIconOutline } from '@heroicons/react/24/outline';
+import { UserGroupIcon, ShieldCheckIcon, UsersIcon, UserIcon, BriefcaseIcon, CheckCircleIcon, ExclamationTriangleIcon, ArrowsRightLeftIcon, TableCellsIcon, PencilSquareIcon, BellIcon, ChevronRightIcon, FunnelIcon, XMarkIcon, UserPlusIcon, ClockIcon, TrashIcon as TrashIconOutline, PlusIcon } from '@heroicons/react/24/outline';
 import AcknowledgmentModal from '../AcknowledgmentModal';
 import UpdateCard from './UpdateCard';
+import CreateUpdateModal from './CreateUpdateModal';
 import SpiiAuditLogsTab from './SpiiAuditLogsTab';
 import SpiiCaseManagementTab from './SpiiCaseManagementTab';
 import FeedbackTab from './FeedbackTab';
@@ -95,6 +96,7 @@ const AdminDashboard = () => {
   const [editProfileModal, setEditProfileModal] = useState({ isOpen: false, user: null, displayName: '', isCoAdmin: false, loading: false });
   const [allTeams, setAllTeams] = useState([]);
   const [updates, setUpdates] = useState([]);
+  const [showCreateUpdate, setShowCreateUpdate] = useState(false);
   const [statusBreakdown, setStatusBreakdown] = useState({});
   const [selectedUpdate, setSelectedUpdate] = useState(null);
   const [showAcknowledgmentModal, setShowAcknowledgmentModal] = useState(false);
@@ -587,6 +589,32 @@ const AdminDashboard = () => {
 
   const toggleSelectAllUpdates = () => {
     setSelectedUpdateIds(prev => (prev.size === updates.length ? new Set() : new Set(updates.map(u => u.id))));
+  };
+
+  // Broadcast updates go on the shared 'trainer-updates' channel (readable by
+  // every signed-in user), same as the Trainer dashboard; firestore.rules
+  // already allows admins to create updates.
+  const BROADCAST_CHANNEL = 'trainer-updates';
+  // Who can be excluded from a broadcast — the same audience the Trainer sees.
+  const broadcastRecipients = users.filter(u => !['admin', 'trainer', 'om', 'som'].includes(u.role));
+
+  const handleCreateUpdate = async (formData) => {
+    try {
+      await createUpdate(
+        BROADCAST_CHANNEL,
+        formData.title,
+        formData.content,
+        user.uid,
+        formData.deadline ? new Date(formData.deadline) : null,
+        formData.excludedUserIds || []
+      );
+      logActivity(user, { eventType: 'update_created', action: 'Created a broadcast update', detail: formData.title });
+      showSuccess('Update created and released to all eligible users');
+    } catch (err) {
+      logger.error('Admin create update error:', err);
+      showError(`Failed to create update: ${err.message || 'Unknown error'}`);
+      throw err; // keep the modal open so nothing typed is lost
+    }
   };
 
   const openDeleteUpdates = (mode, target = null) => setUpdateDeleteModal({ isOpen: true, mode, target });
@@ -1272,9 +1300,12 @@ const AdminDashboard = () => {
             <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">System Updates</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">View, and clean up, all updates sent across every dashboard.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Create broadcast updates, and view or clean up all updates sent across every dashboard.</p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <Button size="sm" onClick={() => setShowCreateUpdate(true)} icon={<PlusIcon className="w-4 h-4 mr-1.5" />}>
+                  Create Update
+                </Button>
                 <Badge variant="primary" className="font-bold">{updates.length} Total</Badge>
                 {selectedUpdateIds.size > 0 && (
                   <Badge variant="error" className="font-bold">{selectedUpdateIds.size} selected</Badge>
@@ -1435,6 +1466,15 @@ const AdminDashboard = () => {
           <Button variant="primary" onClick={handleAddUser} loading={addUserLoading} disabled={addUserLoading || !addUserForm.displayName.trim() || !addUserForm.email.trim()}>Add User</Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Create (broadcast) Update Modal */}
+      <CreateUpdateModal
+        isOpen={showCreateUpdate}
+        onClose={() => setShowCreateUpdate(false)}
+        onSubmit={handleCreateUpdate}
+        currentUser={user}
+        allUsers={broadcastRecipients}
+      />
 
       {/* Acknowledgment Modal */}
       <AcknowledgmentModal
