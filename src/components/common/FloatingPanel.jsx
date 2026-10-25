@@ -16,6 +16,11 @@ import { showInfo } from '../../utils/toast';
  *
  * While floating, the in-page slot shows a placeholder with a "Bring back"
  * button; closing the window (or clicking Bring back) restores it inline.
+ *
+ * `active` controls only the in-page slot: pass false when the host tab isn't
+ * showing. The component stays mounted and the floating window keeps running,
+ * so switching tabs/views does NOT close an open float. Mount this at the
+ * dashboard layout level (not inside a per-tab conditional) for that to hold.
  */
 const pipSupported = () => typeof window !== 'undefined' && 'documentPictureInPicture' in window;
 
@@ -25,7 +30,7 @@ const copyStyles = (win) => {
   });
 };
 
-const FloatingPanel = ({ title = 'Floating window', children, width = 460, height = 680 }) => {
+const FloatingPanel = ({ title = 'Floating window', children, width = 460, height = 680, active = true }) => {
   const [floating, setFloating] = useState(false);
   const winRef = useRef(null);
   const rootRef = useRef(null);
@@ -106,6 +111,10 @@ const FloatingPanel = ({ title = 'Floating window', children, width = 460, heigh
 
   // Close the floating window if this component unmounts (navigating away).
   useEffect(() => () => { if (winRef.current) { try { winRef.current.close(); } catch { /* ignore */ } } }, []);
+
+  // When the host tab isn't showing, render nothing in-page — but stay mounted
+  // so an open floating window survives the tab switch.
+  if (!active) return null;
 
   return (
     <div>

@@ -1409,12 +1409,12 @@ const TeamMemberDashboard = () => {
                 )
               }
 
-              {/* Templates Tab */}
-              {activeTab === 'templates' && (
-                <FloatingPanel title="Templates" width={520} height={720}>
-                  {(floating) => <TemplatesTab user={user} compact={floating} live={live} />}
-                </FloatingPanel>
-              )}
+              {/* Templates — mounted unconditionally (not gated by activeTab) so an
+                  open floating window survives switching to Case Tracker / Calculator.
+                  `active` only toggles the in-page slot. */}
+              <FloatingPanel title="Templates" width={520} height={720} active={activeTab === 'templates'}>
+                {(floating) => <TemplatesTab user={user} compact={floating} live={live} />}
+              </FloatingPanel>
 
               {/* SPII Analytics Tab */}
               {activeTab === 'spii-dashboard' && (
