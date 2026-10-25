@@ -23,7 +23,7 @@ Repo: <https://github.com/vonjoefrey-afk/centralized-hub>
 - **Node.js 20** (matches Cloud Functions runtime).
 - **Firebase CLI** (`npm i -g firebase-tools`) — only needed for manual/local work.
 - A Google account that has been **granted access to the `centralized-gcp`
-  GCP/Firebase project** (see §7).
+  GCP/Firebase project** (see §8).
 
 ---
 
@@ -106,7 +106,7 @@ when an approved change lands on `main`. To enable it once:
    `production`*, then add the **authorized personnel** under *Required
    reviewers*. Now a merge pauses until one of them approves the actual go-live.
 3. **Secrets** — *Settings → Secrets and variables → Actions*, add:
-   - `FIREBASE_SERVICE_ACCOUNT` — full JSON of a GCP service-account key (see §7).
+   - `FIREBASE_SERVICE_ACCOUNT` — full JSON of a GCP service-account key (see §8).
    - All seven `REACT_APP_*` values from §4.
 
 **Resulting flow:** branch → PR → reviewer approves → merge to `main` →
@@ -115,7 +115,44 @@ one runs `firebase deploy` by hand.
 
 ---
 
-## 7. GCP / Firebase project handover
+## 7. Making changes from a browser (no local setup — e.g. a managed Chromebook)
+
+You don't need a terminal, local installs, or filesystem access to change this
+codebase. **Claude Code on the web** runs each session in a cloud sandbox: the
+repo is cloned there, Claude edits the code and runs the commands (`npm install`,
+`npm run build`, `npm test`) in that sandbox, then pushes a branch and opens a
+pull request. You only type prompts in the browser — nothing runs on your
+device, so a locked-down Chromebook is fine.
+
+**One-time setup (in Chrome):**
+
+1. Go to <https://claude.ai/code> and sign in with your Claude account (needs a
+   plan that includes Claude Code).
+2. **Connect GitHub** and authorize access to `vonjoefrey-afk/centralized-hub`.
+3. IT note: the network must allow `claude.ai` and `github.com`.
+
+**Making a change:**
+
+1. Start a session on the repo and describe the change in plain language
+   (e.g. *"Add a CSV export button to the admin User Management table"*).
+2. Claude creates a branch, writes the code, runs the build and tests in the
+   cloud, and opens a **pull request**.
+3. A second maintainer reviews and merges the PR (see §6 — `main` is protected,
+   so every change goes through review). GitHub won't let you approve your own
+   PR, so when one owner opens it, the **other owner approves**.
+4. Merging to `main` triggers the GitHub Action, which deploys to production.
+
+**Notes:**
+
+- Build and tests in the cloud need **no secrets** — Claude never needs the
+  `.env` or the service-account key. Deployment still happens through GitHub
+  Actions (§6), not from Claude's sandbox.
+- Because `main` is protected, a browser-only contributor can still only
+  *propose* changes via PR — production stays gated behind review.
+
+---
+
+## 8. GCP / Firebase project handover
 
 The code is only half the turnover — the app runs on **`centralized-gcp`**.
 
@@ -131,7 +168,7 @@ The code is only half the turnover — the app runs on **`centralized-gcp`**.
 
 ---
 
-## 8. Making the repo private
+## 9. Making the repo private
 
 GitHub repo → *Settings → General → Danger Zone → Change repository visibility →
 Private*. A private repo is visible only to you and collaborators you invite
@@ -140,7 +177,7 @@ remove access when offboarding.
 
 ---
 
-## 9. Where things live (quick map)
+## 10. Where things live (quick map)
 
 - `src/components/dashboards/` — role dashboards (Admin, Team Member, Leader,
   Trainer) + feature tabs (Templates, Notes/Scratchpad, Case Tracker,
@@ -155,7 +192,7 @@ remove access when offboarding.
 
 ---
 
-## 10. Offboarding checklist (for the outgoing owner)
+## 11. Offboarding checklist (for the outgoing owner)
 
 - [ ] All code committed and pushed to `main` (private repo).
 - [ ] Next dev added as a GitHub collaborator.
