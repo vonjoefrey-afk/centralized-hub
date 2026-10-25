@@ -1,7 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { GEMINI_MODEL } = require("./gemini");
+const { generateJson } = require("./gemini");
 
 /**
  * AI triage for a piece of user feedback. Admin-only. Uses Gemini to judge
@@ -34,9 +33,6 @@ exports.analyzeFeedback = async (data, context) => {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
-
     const feedbackBlock = JSON.stringify(
       { type, title, message, featureStatuses, submittedByRole: role, page },
       null,
@@ -63,12 +59,8 @@ Assess it and respond with ONLY a JSON object of this exact shape:
 
 Be concrete and honest. If it is not actually fixable in code (user error, expected behavior, or needs reproduction detail), say so via "fixable" and keep the plan short.`;
 
-    const response = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" },
-    });
+    const { text, model: usedModel } = await generateJson(apiKey, [{ role: "user", parts: [{ text: prompt }] }]);
 
-    const text = response.response.text();
     let analysis;
     try {
       analysis = JSON.parse(text);
@@ -85,7 +77,7 @@ Be concrete and honest. If it is not actually fixable in code (user error, expec
       area: analysis.area || "unknown",
       plan: Array.isArray(analysis.plan) ? analysis.plan : [],
       agentPrompt: analysis.agentPrompt || "",
-      model: GEMINI_MODEL,
+      model: usedModel,
     };
 
     return { success: true, analysis: safe };

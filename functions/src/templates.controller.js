@@ -1,8 +1,7 @@
 const functions = require("firebase-functions");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const mammoth = require("mammoth");
 const xlsx = require("xlsx");
-const { GEMINI_MODEL } = require("./gemini");
+const { generateJson } = require("./gemini");
 
 exports.extractTemplatesFromFile = async (data, context) => {
   // Authentication check
@@ -22,8 +21,6 @@ exports.extractTemplatesFromFile = async (data, context) => {
       throw new Error("GEMINI_API_KEY is not configured.");
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
     // The prompt instructs Gemini to return a strict JSON array
     const prompt = `
@@ -110,14 +107,7 @@ Example format:
     }
 
     console.log(`[extractTemplatesFromFile] Calling Gemini API...`);
-    const response = await model.generateContent({
-      contents: [{ role: "user", parts }],
-      generationConfig: {
-         responseMimeType: "application/json"
-      }
-    });
-
-    const responseText = response.response.text();
+    const { text: responseText } = await generateJson(apiKey, [{ role: "user", parts }]);
     console.log(`[extractTemplatesFromFile] Gemini API returned response of length: ${responseText.length}`);
 
     let templates = [];
