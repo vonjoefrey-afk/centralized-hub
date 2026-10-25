@@ -120,6 +120,9 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
 
   const activeIdRef = useRef(null);
   const documentsRef = useRef([]);
+  // Last known editor HTML for the active doc. React detaches editorRef before
+  // the unmount cleanup runs, so the final save reads from here instead.
+  const liveContentRef = useRef('');
   activeIdRef.current = activeId;
   documentsRef.current = documents;
 
@@ -158,6 +161,7 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
   useEffect(() => {
     if (editorRef.current) {
       editorRef.current.innerHTML = activeDoc?.content || '';
+      liveContentRef.current = editorRef.current.innerHTML;
       const text = htmlToText(activeDoc?.content || '');
       setCounts({ words: wordCount(text), chars: text.length });
     }
@@ -167,8 +171,8 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
   /* ------------------------------- saving -------------------------------- */
   const persist = useCallback(async () => {
     const id = activeIdRef.current;
-    if (!id || !editorRef.current) return;
-    const content = editorRef.current.innerHTML;
+    if (!id) return;
+    const content = editorRef.current ? editorRef.current.innerHTML : liveContentRef.current;
     const src = documentsRef.current.find((d) => d.id === id);
     const title = (src?.title || 'Untitled document').trim() || 'Untitled document';
     try {
@@ -220,7 +224,8 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
 
   /* ------------------------------ editing -------------------------------- */
   const handleInput = () => {
-    const text = htmlToText(editorRef.current?.innerHTML || '');
+    liveContentRef.current = editorRef.current?.innerHTML || '';
+    const text = htmlToText(liveContentRef.current);
     setCounts({ words: wordCount(text), chars: text.length });
     scheduleSave();
   };
@@ -372,12 +377,15 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
     setMenuOpenId(null);
     const src = documentsRef.current.find((d) => d.id === id0);
     if (!src) return;
+    // The open doc's state lags the editor until its save lands; copy what's on screen.
+    const content = id0 === activeIdRef.current ? liveContentRef.current : src.content;
     try {
+      flushNow();
       const title = `Copy of ${src.title}`;
       const parentId = src.parentId ?? null;
       const order = (typeof src.order === 'number' ? src.order : 0) + 0.5; // place right after the original
-      const id = await api.create(user.uid, { title, content: src.content, parentId, order });
-      setDocuments((prev) => [{ id, title, content: src.content, parentId, order, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
+      const id = await api.create(user.uid, { title, content, parentId, order });
+      setDocuments((prev) => [{ id, title, content, parentId, order, createdAt: Date.now(), updatedAt: Date.now() }, ...prev]);
       setActiveId(id);
       logActivity(user, { eventType: 'note_created', action: `Duplicated "${src.title}"`, targetId: id });
     } catch (err) {
@@ -489,7 +497,7 @@ const ScratchpadTab = ({ user, spiiSettings, api = defaultApi }) => {
             onToggleCollapse={toggleCollapse}
             onMenuToggle={(id) => setMenuOpenId(menuOpenId === id ? null : id)}
             onMove={handleMove}
-            onRename={(id) => { setMenuOpenId(null); setActiveId(id); setRenamingId(id); }}
+            onRename={(id) => { setMenuOpenId(null); if (id !== activeId) flushNow(); setActiveId(id); setRenamingId(id); }}
             onDuplicate={handleDuplicate}
             onDelete={(id) => { setMenuOpenId(null); setConfirmDelete(documentsRef.current.find((d) => d.id === id) || null); }}
             onAddSubtab={handleAddSubtab}
