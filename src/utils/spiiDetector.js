@@ -114,6 +114,23 @@ export const detectSPII = (text) => {
 };
 
 /**
+ * Returns `text` with every detected SPII value replaced by its redacted form
+ * (first 4 chars kept, rest masked), plus the detections — for safely
+ * displaying free text such as case notes.
+ * @param {string} text
+ * @returns {{ text: string, detections: Array<{type:string, value:string, redacted:string}> }}
+ */
+export const maskSPII = (text) => {
+  const detections = detectSPII(text);
+  if (detections.length === 0) return { text: text || '', detections };
+  // Longest values first so a value that contains another is masked whole.
+  const masked = [...detections]
+    .sort((a, b) => b.value.length - a.value.length)
+    .reduce((acc, d) => acc.split(d.value).join(d.redacted), text);
+  return { text: masked, detections };
+};
+
+/**
  * Whether text contains any sensitive information.
  * @param {string} text
  * @returns {boolean}
