@@ -439,9 +439,10 @@ const CaseTrackerTab = () => {
                 type="danger"
             />
 
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start mt-8">
+            {/* Form keeps a fixed, comfortable width; the ledger takes the rest of the screen. */}
+            <div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] 2xl:grid-cols-[440px_minmax(0,1fr)] gap-6 2xl:gap-8 items-start mt-2">
                 {/* Left Column: Form Container */}
-                <div className="xl:col-span-4 relative overflow-hidden rounded-3xl bg-white/70 dark:bg-[#111111]/70 backdrop-blur-xl shadow-2xl shadow-indigo-500/10 border border-white/20 dark:border-white/5 transition-all duration-500 hover:shadow-indigo-500/20">
+                <div className="relative overflow-hidden rounded-3xl bg-white/70 dark:bg-[#111111]/70 backdrop-blur-xl shadow-2xl shadow-indigo-500/10 border border-white/20 dark:border-white/5 transition-all duration-500 hover:shadow-indigo-500/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-cyan-500 to-pink-500 opacity-80"></div>
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
                 <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -569,7 +570,7 @@ const CaseTrackerTab = () => {
 
                             {/* Combined Toggles: SPII & Transferred */}
                             <div className="col-span-1">
-                                <div className="flex flex-row items-start space-x-12">
+                                <div className="flex flex-row flex-wrap items-start gap-x-8 gap-y-4">
                                     {/* SPII */}
                                     <div>
                                         <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] mb-3 ml-1">
@@ -717,7 +718,7 @@ const CaseTrackerTab = () => {
                 </div>
             </div>
             {/* Right Column: Premium Ledger Section */}
-            <div className="xl:col-span-8 relative overflow-hidden rounded-3xl bg-white/70 dark:bg-[#111111]/70 backdrop-blur-xl shadow-2xl shadow-purple-500/10 border border-white/20 dark:border-white/5 transition-all duration-500 hover:shadow-purple-500/20 flex flex-col h-full">
+            <div className="min-w-0 relative overflow-hidden rounded-3xl bg-white/70 dark:bg-[#111111]/70 backdrop-blur-xl shadow-2xl shadow-purple-500/10 border border-white/20 dark:border-white/5 transition-all duration-500 hover:shadow-purple-500/20 flex flex-col h-full">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 opacity-80"></div>
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
                 <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -734,7 +735,7 @@ const CaseTrackerTab = () => {
                     </div>
 
                     {/* Advanced Filter Toolbar */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/50 dark:bg-white/[0.02] p-5 rounded-2xl border border-gray-100 dark:border-white/10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-5 gap-4 bg-gray-50/50 dark:bg-white/[0.02] p-5 rounded-2xl border border-gray-100 dark:border-white/10">
                         
                         {/* Date Filter */}
                         <PremiumSelect
@@ -1218,8 +1219,8 @@ const CaseTrackerTab = () => {
                         ))}
                     </div>
                 ) : (
-                    /* Comfortable Grid View */
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    /* Comfortable Grid View — as many ≥400px cards per row as fit */
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,400px),1fr))] gap-5">
                         {filteredCases.map((c) => (
                             <div
                                 key={c.id}
@@ -1233,13 +1234,13 @@ const CaseTrackerTab = () => {
 
                                 <div className="flex flex-col h-full space-y-5">
                                     {/* Card Header */}
-                                    <div className="flex items-start justify-between">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center space-x-2">
-                                                <h4 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="space-y-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h4 className="text-lg font-black text-gray-900 dark:text-white tracking-tight break-all" title={c.caseId}>
                                                     #{c.caseId}
                                                 </h4>
-                                                <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-wider">
+                                                <span className="shrink-0 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-wider">
                                                     {c.origin}
                                                 </span>
                                             </div>
@@ -1435,9 +1436,10 @@ const CaseTrackerTab = () => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-2 gap-4 h-full">
+                                            /* Six equal tiles in a 3×2 grid (2×3 on narrow cards), then notes */
+                                            <div className="grid grid-cols-2 min-[400px]:grid-cols-3 gap-3 content-start">
                                                 <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
-                                                    <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Current State</p>
+                                                    <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Status</p>
                                                     <div className="flex items-center space-x-2">
                                                         <div className={`w-2 h-2 rounded-full ${c.status === 'Closed' ? 'bg-emerald-500' :
                                                             c.status === 'SO' ? 'bg-amber-500' :
@@ -1455,7 +1457,7 @@ const CaseTrackerTab = () => {
                                                 <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
                                                     <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Survey</p>
                                                     <span className={`text-sm font-bold ${c.survey === 'Not applicable' ? 'text-gray-400' : 'text-gray-900 dark:text-white'
-                                                        }`}>{c.survey}</span>
+                                                        }`} title={c.survey}>{c.survey === 'Not applicable' ? 'N/A' : c.survey}</span>
                                                 </div>
 
                                                 <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
@@ -1495,27 +1497,20 @@ const CaseTrackerTab = () => {
                                                         'text-sm font-bold',
                                                         c.surveyStatus === 'Valid' ? 'text-emerald-500' :
                                                             c.surveyStatus === 'Invalid' ? 'text-red-500' : 'text-gray-400'
-                                                    )}>
-                                                        {c.surveyStatus || 'N/A'}
+                                                    )} title={c.surveyStatus}>
+                                                        {!c.surveyStatus || c.surveyStatus === 'Not applicable' ? 'N/A' : c.surveyStatus}
                                                     </span>
                                                 </div>
 
-                                                <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5 col-span-2">
+                                                <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
                                                     <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">SPII / Transfer</p>
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex gap-2">
-                                                            <Badge variant={c.isSpii === 'Yes' ? 'danger' : 'neutral'} size="sm">
-                                                                SPII: {c.isSpii || 'No'}
-                                                            </Badge>
-                                                            <Badge variant={c.isTransferred === 'Yes' ? 'warning' : 'neutral'} size="sm">
-                                                                Transferred: {c.isTransferred || 'No'}
-                                                            </Badge>
-                                                        </div>
-                                                        {c.transferValidation && (
-                                                            <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider">
-                                                                Valid: {c.transferValidation}
-                                                            </span>
-                                                        )}
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        <Badge variant={c.isSpii === 'Yes' ? 'danger' : 'neutral'} size="sm">
+                                                            SPII: {c.isSpii || 'No'}
+                                                        </Badge>
+                                                        <Badge variant={c.isTransferred === 'Yes' ? 'warning' : 'neutral'} size="sm">
+                                                            {c.isTransferred === 'Yes' ? `Transfer: ${c.transferValidation || 'Yes'}` : 'No transfer'}
+                                                        </Badge>
                                                     </div>
                                                 </div>
 
@@ -1524,6 +1519,8 @@ const CaseTrackerTab = () => {
                                             </div>
                                         )}
                                     </div>
+                                         {/* Flags footer — only when there is something to flag */}
+                                         {(c.isSpii === 'Yes' || c.isTransferred === 'Yes') && (
                                          <div className="mt-auto pt-4 border-t border-red-500/10 flex flex-wrap gap-3">
                                             {c.isSpii === 'Yes' && (
                                                 <div className="flex items-center space-x-2">
@@ -1538,6 +1535,7 @@ const CaseTrackerTab = () => {
                                                 </div>
                                             )}
                                         </div>
+                                         )}
                                 </div>
                             </div>
                         ))}

@@ -1099,6 +1099,8 @@ const TeamLeaderDashboard = () => {
       onSignOut={handleSignOut}
       onChangePassword={() => setShowChangePasswordModal(true)}
       onRefresh={handleRefresh}
+      // Case Tracker is a form + card ledger: let it use the full width.
+      fullWidth={activeTab === 'case-tracker'}
       topRight={(
         <>
               {/* Notification Bell */}
