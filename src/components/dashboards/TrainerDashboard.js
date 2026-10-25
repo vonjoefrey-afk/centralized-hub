@@ -14,6 +14,7 @@ import UpdateCard from './UpdateCard';
 import CreateUpdateModal from './CreateUpdateModal';
 import NotificationCenter from '../common/NotificationCenter';
 import DashboardShell from './DashboardShell';
+import SpiiCaseManagementTab from './SpiiCaseManagementTab';
 import { renderContentWithLinks } from '../../utils/text';
 import { Button, Card, Badge, Modal, Skeleton, CardSkeleton, EmptyState, Alert, Input, DateTimePicker } from '../ui';
 import { showSuccess, showError } from '../../utils/toast';
@@ -376,6 +377,7 @@ const TrainerDashboard = () => {
     ...(features.updates ? [{ id: 'updates', label: 'Updates' }] : []),
     ...(features.gcpBilling ? [{ id: 'gcp-billing', label: 'GCP Billing' }] : []),
     ...(features.notes ? [{ id: 'notes', label: 'Notes' }] : []),
+    { id: 'spii-cases-mgmt', label: 'SPII Case Management' },
   ];
 
   return (
@@ -475,6 +477,10 @@ const TrainerDashboard = () => {
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Notes</h3>
             <p className="text-gray-500">Scratchpad and persistent notes will be available here.</p>
           </div>
+        )}
+
+        {activeTab === 'spii-cases-mgmt' && (
+          <SpiiCaseManagementTab />
         )}
 
 

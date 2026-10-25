@@ -101,6 +101,20 @@ export const FEATURE_FLOWS = {
   F -->|Yes| H[("Generate CSV")]
   H --> G`,
 
+  'team-member:spii-case-management': `flowchart TD
+  A(["Open SPII Case Management"]) --> B{"Admin/Trainer/TL or POC?"}
+  B -->|No| X(["No access"])
+  B -->|Yes| C[/"Load all SPII cases"/]
+  C --> D["Pick any case (any owner)"]
+  D --> E["Edit fields in dialog"]
+  E --> F{"Set status?"}
+  F -->|"Closed / SO"| G["Case resolved"]
+  F -->|Other| H["Case stays open"]
+  G --> I[("Save to source case")]
+  H --> I
+  I --> J["Sync updates mirror; stamp lastEditedBy"]
+  J --> K(["Closed cases drop from chat follow-up"])`,
+
   'team-member:templates': `flowchart TD
   A(["Open Templates tab"]) --> B{"Have templates?"}
   B -->|No| C["Create manually or AI-import"]
