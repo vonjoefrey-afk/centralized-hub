@@ -9,6 +9,9 @@ import { Card, EmptyState, Badge, Button, PremiumSelect } from '../ui';
 import { AuroraBarChart, AuroraDonutChart } from '../ui/charts';
 import { ChartBarIcon, UserGroupIcon, ArrowDownTrayIcon, BoltIcon, InboxStackIcon } from '@heroicons/react/24/outline';
 import { showError, showSuccess } from '../../utils/toast';
+import { downloadCsv } from '../../utils/csv';
+import { formatManilaDateTime } from '../../utils/caseExport';
+import { WORK_TYPE_FILTER_OPTIONS, getWorkType, matchesWorkType } from '../../constants/caseFields';
 
 const BACKLOG_STATUSES = ['Assigned', 'WOCR', 'WOCRE', 'IPTP', 'IPGS', 'IPGE', 'IPGO', 'IPCR'];
 
@@ -26,6 +29,8 @@ const MetricAnalyticsTab = () => {
     const [filterDateRange, setFilterDateRange] = useState('All');
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
+    // Case Type (EOD classification: New Case / Backlog / Unclassified legacy)
+    const [filterWorkType, setFilterWorkType] = useState('All');
 
     // Metric focus (Survey deprecated; IRT + Backlogs retained)
     const [metricIndex, setMetricIndex] = useState('IRT');
@@ -185,6 +190,7 @@ const MetricAnalyticsTab = () => {
             if (filterTeam !== 'All' && c.teamId !== filterTeam) return false;
             if (filterUser !== 'All' && c.userId !== filterUser) return false;
             if (!isWithinDateRange(c.createdAt, filterDateRange)) return false;
+            if (!matchesWorkType(c, filterWorkType)) return false;
 
             // Metric Index Specific Logic
             if (metricIndex === 'IRT') {
@@ -197,7 +203,7 @@ const MetricAnalyticsTab = () => {
             }
             return true;
         });
-    }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate, metricIndex, filterIrtOrigin, filterIrtBreachType, filterBacklogStatus]);
+    }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate, filterWorkType, metricIndex, filterIrtOrigin, filterIrtBreachType, filterBacklogStatus]);
 
     // Aggregate IRT Metrics
     const irtStats = useMemo(() => {
@@ -205,9 +211,10 @@ const MetricAnalyticsTab = () => {
             if (filterTeam !== 'All' && c.teamId !== filterTeam) return false;
             if (filterUser !== 'All' && c.userId !== filterUser) return false;
             if (!isWithinDateRange(c.createdAt, filterDateRange)) return false;
+            if (!matchesWorkType(c, filterWorkType)) return false;
             return true;
         });
-        
+
         let totalBreaches = 0;
         let chatBreaches = 0;
         let emailBreaches = 0;
@@ -236,7 +243,7 @@ const MetricAnalyticsTab = () => {
         ].filter((o) => o.value > 0);
 
         return { totalBreaches, chatBreaches, emailBreaches, topReason, reasonList, originList };
-    }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate]);
+    }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate, filterWorkType]);
 
     // Aggregate Backlog Metrics
     const backlogStats = useMemo(() => {
@@ -244,6 +251,7 @@ const MetricAnalyticsTab = () => {
             if (filterTeam !== 'All' && c.teamId !== filterTeam) return false;
             if (filterUser !== 'All' && c.userId !== filterUser) return false;
             if (!isWithinDateRange(c.createdAt, filterDateRange)) return false;
+            if (!matchesWorkType(c, filterWorkType)) return false;
             return true;
         });
 
@@ -302,7 +310,7 @@ const MetricAnalyticsTab = () => {
             teamList, 
             agentList 
         };
-    }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate, usersMapGlobal, teamsMap, filterBacklogStatus]);
+    }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate, filterWorkType, usersMapGlobal, teamsMap, filterBacklogStatus]);
 
     const handleExportCSV = () => {
         if (filteredRawCases.length === 0) {
@@ -314,43 +322,39 @@ const MetricAnalyticsTab = () => {
         let rows = [];
 
         if (metricIndex === 'Backlogs') {
-            headers = ["Case ID", "Origin", "Agent", "Team", "Status", "Aging (Hours)", "Timeline"];
+            headers = ["Case ID", "Case Type", "Origin", "Agent", "Team", "Status", "Aging (Hours)", "Timeline"];
             const now = Date.now();
             rows = filteredRawCases.map(c => {
                 const ageMs = now - (c.createdAt?.toMillis?.() || new Date(c.createdAt).getTime());
                 const ageHrs = (ageMs / (1000 * 60 * 60)).toFixed(1);
                 return [
-                    `"${c.caseId || ''}"`,
-                    `"${c.origin || ''}"`,
-                    `"${usersMapGlobal[c.userId] || c.userDisplayName || 'Anonymous'}"`,
-                    `"${teamsMap[c.teamId] || c.teamId || ''}"`,
-                    `"${c.status || ''}"`,
-                    `"${ageHrs}"`,
-                    `"${c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString() : 'Syncing'}"`
+                    c.caseId || '',
+                    getWorkType(c),
+                    c.origin || '',
+                    usersMapGlobal[c.userId] || c.userDisplayName || 'Anonymous',
+                    teamsMap[c.teamId] || c.teamId || '',
+                    c.status || '',
+                    ageHrs,
+                    c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString() : 'Syncing'
                 ];
             });
         } else {
             // IRT
-            headers = ["Case ID", "Origin", "Agent", "Team", "IRT Breach Type", "Timeline"];
+            headers = ["Case ID", "Case Type", "Origin", "Agent", "Team", "IRT Breach Type", "Timeline"];
             rows = filteredRawCases.map(c => [
-                `"${c.caseId || ''}"`,
-                `"${c.origin || ''}"`,
-                `"${usersMapGlobal[c.userId] || c.userDisplayName || 'Anonymous'}"`,
-                `"${teamsMap[c.teamId] || c.teamId || ''}"`,
-                `"${c.irt || ''}"`,
-                `"${c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString() : 'Syncing'}"`
+                c.caseId || '',
+                getWorkType(c),
+                c.origin || '',
+                usersMapGlobal[c.userId] || c.userDisplayName || 'Anonymous',
+                teamsMap[c.teamId] || c.teamId || '',
+                c.irt || '',
+                c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString() : 'Syncing'
             ]);
         }
-        
-        const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Metric_Analytics_Export_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+
+        // downloadCsv quotes/escapes every cell (commas, quotes, newlines in names).
+        // Manila date in the filename so an early-morning EOD export isn't stamped with yesterday (UTC).
+        downloadCsv(`Metric_Analytics_Export_${formatManilaDateTime(new Date()).slice(0, 10)}.csv`, headers, rows);
         showSuccess("Analytics exported successfully!");
     };
 
@@ -455,6 +459,16 @@ const MetricAnalyticsTab = () => {
                                         { label: 'Custom Range', value: 'Custom' }
                                     ]}
                                     onChange={(val) => setFilterDateRange(val)}
+                                />
+                            </div>
+
+                            {/* Case Type Filter (EOD: New Case vs Backlog) */}
+                            <div className="space-y-2">
+                                <PremiumSelect
+                                    label="Case Type"
+                                    value={filterWorkType}
+                                    options={WORK_TYPE_FILTER_OPTIONS.map(opt => ({ label: opt === 'All' ? 'All Types' : opt, value: opt }))}
+                                    onChange={(val) => setFilterWorkType(val)}
                                 />
                             </div>
 
@@ -758,7 +772,7 @@ const MetricAnalyticsTab = () => {
                                             <tr key={c.id} className="group hover:bg-indigo-50/30 dark:hover:bg-indigo-500/5 transition-colors">
                                                 <td className="px-6 py-5 whitespace-nowrap">
                                                     <div className="text-sm font-black text-gray-900 dark:text-white">#{c.caseId}</div>
-                                                    <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Origin: {c.origin}</div>
+                                                    <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tighter">Origin: {c.origin} · {getWorkType(c)}</div>
                                                 </td>
                                                 <td className="px-6 py-5 whitespace-nowrap">
                                                     <div className="text-sm font-black text-gray-800 dark:text-gray-200">{usersMapGlobal[c.userId] || c.userDisplayName || 'Anonymous'}</div>

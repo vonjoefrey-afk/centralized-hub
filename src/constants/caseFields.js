@@ -4,6 +4,17 @@
 export const STATUS_OPTIONS = ['Assigned', 'SO', 'Closed', 'WOCR', 'WOCRE', 'IPGS', 'IPTP', 'IPGO', 'IPGE', 'IPCR'];
 // Case classification for EOD reporting — new work vs. carried-over backlog.
 export const WORK_TYPE_OPTIONS = ['New Case', 'Backlog'];
+// Cases logged before the Case Type field existed have no workType; they are
+// shown, filtered and exported under this label instead of being guessed.
+export const WORK_TYPE_UNCLASSIFIED = 'Unclassified';
+export const WORK_TYPE_FILTER_OPTIONS = ['All', ...WORK_TYPE_OPTIONS, WORK_TYPE_UNCLASSIFIED];
+
+/** A case's Case Type for display, filtering and export (legacy → Unclassified). */
+export const getWorkType = (c) =>
+  WORK_TYPE_OPTIONS.includes(c?.workType) ? c.workType : WORK_TYPE_UNCLASSIFIED;
+
+/** True when a case passes a Case Type filter value from WORK_TYPE_FILTER_OPTIONS. */
+export const matchesWorkType = (c, filter) => filter === 'All' || getWorkType(c) === filter;
 export const ORIGIN_OPTIONS = ['Chat', 'Email'];
 export const SURVEY_OPTIONS = ['CES', 'NCES', 'Not applicable'];
 export const SPII_OPTIONS = ['Yes', 'No'];

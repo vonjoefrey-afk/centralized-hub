@@ -6,7 +6,7 @@ import { addTrackedCase, getTrackedCasesByUser, deleteTrackedCase, updateTracked
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Button, Card, EmptyState, Badge, ConfirmModal, PremiumSelect } from '../ui';
-import { ClipboardDocumentListIcon, TrashIcon, PencilIcon, CheckIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentListIcon, TrashIcon, PencilIcon, CheckIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { showSuccess, showError, showInfo } from '../../utils/toast';
 import { detectSPII } from '../../utils/spiiDetector';
 import { logActivity } from '../../services/activity';
@@ -17,8 +17,22 @@ import { AuroraBarChart, AuroraDonutChart } from '../ui/charts';
 import {
     STATUS_OPTIONS, ORIGIN_OPTIONS, SURVEY_OPTIONS, SPII_OPTIONS, TRANSFER_OPTIONS,
     TRANSFER_VALIDATION_OPTIONS, IRT_OPTIONS_EMAIL, IRT_OPTIONS_CHAT, IRT_TYPE_OPTIONS_CHAT,
-    WORK_TYPE_OPTIONS,
+    WORK_TYPE_OPTIONS, WORK_TYPE_FILTER_OPTIONS, WORK_TYPE_UNCLASSIFIED, getWorkType, matchesWorkType,
 } from '../../constants/caseFields';
+import { downloadCsv } from '../../utils/csv';
+import { CASE_TRACKER_CSV_HEADERS, buildCaseTrackerCsvRows, countByWorkType } from '../../utils/caseExport';
+
+// Pill colors for the Case Type badge (Unclassified = legacy cases with no workType).
+const WORK_TYPE_BADGE = {
+    'New Case': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    'Backlog': 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+    [WORK_TYPE_UNCLASSIFIED]: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400',
+};
+const WORK_TYPE_TEXT = {
+    'New Case': 'text-emerald-600 dark:text-emerald-300',
+    'Backlog': 'text-amber-600 dark:text-amber-300',
+    [WORK_TYPE_UNCLASSIFIED]: 'text-gray-400',
+};
 
 // Compute the current date string in Manila timezone (Asia/Manila, UTC+8)
 const getManilaDateString = (dateObj = new Date()) => {
@@ -114,7 +128,8 @@ const CaseTrackerTab = () => {
         setEditingCaseId(c.id);
         setEditForm({
             status: c.status,
-            workType: c.workType || 'New Case',
+            // Legacy cases stay Unclassified until the owner explicitly picks a type.
+            workType: WORK_TYPE_OPTIONS.includes(c.workType) ? c.workType : '',
             survey: c.survey || 'Not applicable',
             surveyStatus: c.surveyStatus || 'N/A',
             origin: c.origin || 'Chat',
@@ -164,6 +179,8 @@ const CaseTrackerTab = () => {
                 isTransferred: editForm.isTransferred,
                 transferValidation: editForm.transferValidation
             };
+            // Don't write an empty Case Type onto a legacy case that wasn't classified.
+            if (!updatedPayload.workType) delete updatedPayload.workType;
 
             await updateTrackedCase(docId, updatedPayload);
 
@@ -216,7 +233,8 @@ const CaseTrackerTab = () => {
         // Search
         const matchesSearch = (c.caseId?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
             (c.origin?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-            (c.status?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+            (c.status?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            getWorkType(c).toLowerCase().includes(searchTerm.toLowerCase());
         if (!matchesSearch) return false;
 
         // Status Filter
@@ -230,7 +248,7 @@ const CaseTrackerTab = () => {
         if (surveyFilter !== 'All' && c.survey !== surveyFilter) return false;
 
         // Case Type (work type) Filter
-        if (workTypeFilter !== 'All' && c.workType !== workTypeFilter) return false;
+        if (!matchesWorkType(c, workTypeFilter)) return false;
 
         // Date Filter
         if (dateFilter !== 'All Time') {
@@ -277,6 +295,18 @@ const CaseTrackerTab = () => {
     useEffect(() => {
         loadCases();
     }, [loadCases]);
+
+    // EOD export: exactly what the ledger currently shows (all active filters applied).
+    const handleExportCsv = () => {
+        if (filteredCases.length === 0) {
+            showError('No cases to export.');
+            return;
+        }
+        const scope = [dateFilter, workTypeFilter !== 'All' ? workTypeFilter : null]
+            .filter(Boolean).join('-').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        downloadCsv(`case-tracker-${scope}-${getManilaDateString()}.csv`, CASE_TRACKER_CSV_HEADERS, buildCaseTrackerCsvRows(filteredCases));
+        showSuccess(`Exported ${filteredCases.length} case${filteredCases.length === 1 ? '' : 's'}`);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -734,7 +764,7 @@ const CaseTrackerTab = () => {
                         <PremiumSelect
                             label="Case Type"
                             value={workTypeFilter}
-                            options={['All', ...WORK_TYPE_OPTIONS]}
+                            options={WORK_TYPE_FILTER_OPTIONS}
                             onChange={(val) => setWorkTypeFilter(val)}
                         />
 
@@ -794,6 +824,17 @@ const CaseTrackerTab = () => {
                                 <ListBulletIcon className="w-5 h-5" />
                             </button>
                         </div>
+
+                        <button
+                            type="button"
+                            onClick={handleExportCsv}
+                            disabled={loading || filteredCases.length === 0}
+                            title="Download the cases currently shown (filters applied) as CSV"
+                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider bg-indigo-500 text-white hover:bg-indigo-600 disabled:opacity-40 transition-all duration-300"
+                        >
+                            <ArrowDownTrayIcon className="w-4 h-4" />
+                            Export CSV
+                        </button>
                     </div>
 
                     {/* Interactive Analytics Charts */}
@@ -823,9 +864,21 @@ const CaseTrackerTab = () => {
                         const originData = Object.entries(originCounts).map(([name, value]) => ({ name, value }));
                         const totalCases = filteredCases.length;
                         const breachRate = totalCases > 0 ? Math.round((irtBreachCount / totalCases) * 100) : 0;
+                        const workTypeCounts = countByWorkType(filteredCases);
 
                         return (
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* EOD split: New Case vs Backlog (Unclassified only when legacy cases are in view) */}
+                                <div className="col-span-full flex flex-wrap items-center gap-2 bg-gray-50/50 dark:bg-white/[0.02] rounded-2xl px-4 py-3 border border-gray-100 dark:border-white/10">
+                                    <p className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.1em] mr-2">Case Type</p>
+                                    {[...WORK_TYPE_OPTIONS, WORK_TYPE_UNCLASSIFIED]
+                                        .filter(t => t !== WORK_TYPE_UNCLASSIFIED || workTypeCounts[t])
+                                        .map(t => (
+                                            <span key={t} className={`text-xs font-bold px-3 py-1 rounded-full ${WORK_TYPE_BADGE[t]}`}>
+                                                {t}: {workTypeCounts[t] || 0}
+                                            </span>
+                                        ))}
+                                </div>
                                 {/* Summary Stats Row */}
                                 <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/5 dark:to-purple-500/5 rounded-2xl p-4 border border-indigo-500/10 dark:border-indigo-500/10 flex flex-col items-center justify-center">
                                     <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{totalCases}</p>
@@ -931,8 +984,8 @@ const CaseTrackerTab = () => {
                                         </div>
 
                                         {/* Case Type (EOD) */}
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${c.workType === 'Backlog' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' : c.workType === 'New Case' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'}`}>
-                                            {c.workType || '—'}
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${WORK_TYPE_BADGE[getWorkType(c)]}`}>
+                                            {getWorkType(c)}
                                         </span>
 
                                         <div className="flex items-center space-x-4">
@@ -952,6 +1005,7 @@ const CaseTrackerTab = () => {
                                                         value={editForm.workType}
                                                         icon={<span className="text-[10px] font-bold opacity-70">WT:</span>}
                                                         options={WORK_TYPE_OPTIONS}
+                                                        placeholder={WORK_TYPE_UNCLASSIFIED}
                                                         onChange={(val) => setEditForm({ ...editForm, workType: val })}
                                                         className="w-[120px]"
                                                     />
@@ -1238,6 +1292,7 @@ const CaseTrackerTab = () => {
                                                             size="md"
                                                             value={editForm.workType}
                                                             options={WORK_TYPE_OPTIONS}
+                                                            placeholder={WORK_TYPE_UNCLASSIFIED}
                                                             onChange={(val) => setEditForm({ ...editForm, workType: val })}
                                                             className="bg-white/50 dark:bg-white/[0.02]"
                                                         />
@@ -1367,7 +1422,7 @@ const CaseTrackerTab = () => {
 
                                                 <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
                                                     <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Case Type</p>
-                                                    <span className={`text-sm font-bold ${c.workType === 'Backlog' ? 'text-amber-600 dark:text-amber-300' : c.workType === 'New Case' ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-400'}`}>{c.workType || '—'}</span>
+                                                    <span className={`text-sm font-bold ${WORK_TYPE_TEXT[getWorkType(c)]}`}>{getWorkType(c)}</span>
                                                 </div>
 
                                                 <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
