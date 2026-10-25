@@ -509,11 +509,14 @@ const UtilizationMonitorTab = () => {
   ];
 
   return (
-    <div className="space-y-8 pt-4 pb-12 animate-in fade-in duration-500">
+    // Laid out for wide screens (the admin shell renders this tab full-width):
+    // charts flow 2 → 3 → 6 per row and, on very wide screens, the user table
+    // and audit trail sit side by side — so less vertical scrolling.
+    <div className="space-y-6 pt-2 pb-12 animate-in fade-in duration-500">
       {/* Header */}
       <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-[#111111] border border-gray-200/50 dark:border-white/5 shadow-xl">
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-cyan-500 to-pink-500"></div>
-        <div className="px-6 py-8 sm:px-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="px-6 py-5 sm:px-8 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-500/10 rounded-2xl">
               <ChartBarIcon className="w-8 h-8 text-indigo-500" />
@@ -540,24 +543,24 @@ const UtilizationMonitorTab = () => {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         {statCards.map((s) => (
           <Card key={s.label} className="bg-white/90 dark:bg-[#111111]/80 border border-gray-200/50 dark:border-white/10 rounded-[2rem] p-1">
             <div className="flex items-center p-3">
               <div className={`flex-shrink-0 p-3.5 bg-gradient-to-br ${s.grad} shadow-lg rounded-2xl`}>
                 <s.icon className="h-6 w-6 text-white" />
               </div>
-              <div className="ml-5">
+              <div className="ml-4 min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">{s.label}</p>
-                <p className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter mt-1">{s.value}</p>
+                <p className="text-2xl 2xl:text-3xl font-black text-gray-900 dark:text-white tracking-tighter mt-1 whitespace-nowrap">{s.value}</p>
               </div>
             </div>
           </Card>
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Charts — one grid: 1 → 2 (lg) → 3 (xl) → all 6 in a row (≥2200px) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 min-[2200px]:grid-cols-6 gap-6 [&>*]:min-w-0">
         <Card className="bg-white dark:bg-[#111111] border border-gray-200/50 dark:border-white/5 rounded-3xl p-6">
           <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Active Time — Top Users (min)</h3>
           {activeTimeChart.length === 0 ? (
@@ -589,16 +592,12 @@ const UtilizationMonitorTab = () => {
           <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Cases Recorded (14 days)</h3>
           <AuroraAreaChart data={casesOverTimeChart} xKey="date" yKey="cases" unit="cases" height={220} />
         </Card>
-      </div>
 
-      {/* Charts — row 2: activity trend (Neon line), full width */}
-      <Card className="bg-white dark:bg-[#111111] border border-gray-200/50 dark:border-white/5 rounded-3xl p-6">
-        <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Activity — Events (14 days)</h3>
-        <NeonLineChart data={activityTrendChart} xKey="date" yKey="events" unit="events" height={220} />
-      </Card>
+        <Card className="bg-white dark:bg-[#111111] border border-gray-200/50 dark:border-white/5 rounded-3xl p-6">
+          <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Activity — Events (14 days)</h3>
+          <NeonLineChart data={activityTrendChart} xKey="date" yKey="events" unit="events" height={220} />
+        </Card>
 
-      {/* Charts — row 3: rate gauges */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white dark:bg-[#111111] border border-gray-200/50 dark:border-white/5 rounded-3xl p-6 flex flex-col">
           <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Active Rate (Today)</h3>
           <div className="flex-1 flex items-center justify-center">
@@ -654,6 +653,10 @@ const UtilizationMonitorTab = () => {
         </Card>
       </div>
 
+      {/* Tables: stacked, or side by side on very wide screens (the 9-column
+          user table gets the larger share so it doesn't scroll sideways) */}
+      <div className="grid grid-cols-1 min-[2400px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6 items-start [&>*]:min-w-0">
+      <div className="space-y-6">
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
@@ -796,6 +799,7 @@ const UtilizationMonitorTab = () => {
 
       {/* Template live sessions (per case) */}
       <LiveSessionsPanel audit={audit} />
+      </div>
 
       {/* Forensic audit trail */}
       <div className="bg-white dark:bg-[#111111] rounded-[2.5rem] shadow-2xl border border-gray-200 dark:border-white/5 overflow-hidden">
@@ -889,6 +893,7 @@ const UtilizationMonitorTab = () => {
           </table>
         </div>
         <Pagination page={auditPage} pageSize={AUDIT_PER_PAGE} total={filteredAudit.length} onPageChange={setAuditPage} />
+      </div>
       </div>
 
       {/* Per-user forensic drill-down */}

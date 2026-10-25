@@ -58,6 +58,7 @@ const focusRing ='focus:outline-none focus-visible:ring-2 focus-visible:ring-ind
  * @param {string}   activeId      - current section id
  * @param {Function} onNavigate    - (id) => void, sets the active section
  * @param {string}   title         - optional override for the page heading
+ * @param {boolean}  fullWidth     - drop the 1400px content cap (for dense, dashboard-style tabs)
  * @param {Function} onSignOut, onChangePassword, onRefresh - passed to UserMenu
  */
 const DashboardShell = ({
@@ -66,6 +67,7 @@ const DashboardShell = ({
   activeId,
   onNavigate,
   title,
+  fullWidth = false,
   onSignOut,
   onChangePassword,
   onRefresh,
@@ -373,7 +375,7 @@ const DashboardShell = ({
         )}
 
         {/* Page content */}
-        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24">
+        <main className={`${fullWidth ? 'max-w-none' : 'max-w-[1400px]'} mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24`}>
           {activeLabel && (
             <div className="mb-5">
               <div className="text-[11px] font-mono text-gray-400 dark:text-gray-500">{role} › {activeLabel}</div>
