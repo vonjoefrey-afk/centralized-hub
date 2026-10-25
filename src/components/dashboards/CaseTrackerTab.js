@@ -6,7 +6,8 @@ import { addTrackedCase, getTrackedCasesByUser, deleteTrackedCase, updateTracked
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Button, Card, EmptyState, Badge, ConfirmModal, PremiumSelect } from '../ui';
-import { ClipboardDocumentListIcon, TrashIcon, PencilIcon, CheckIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentListIcon, TrashIcon, PencilIcon, CheckIcon, XMarkIcon, MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon, ArrowDownTrayIcon, ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
+import CaseNotes from './CaseNotes';
 import { showSuccess, showError, showInfo } from '../../utils/toast';
 import { detectSPII } from '../../utils/spiiDetector';
 import { logActivity } from '../../services/activity';
@@ -100,6 +101,13 @@ const CaseTrackerTab = () => {
         comments: ''
     });
     const [isSaving, setIsSaving] = useState(false);
+    // Compact list: ids of rows whose notes panel is expanded.
+    const [expandedNotes, setExpandedNotes] = useState(() => new Set());
+    const toggleNotes = (id) => setExpandedNotes((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
 
     // Modal states for native React deletion confirmation
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -959,8 +967,9 @@ const CaseTrackerTab = () => {
                         {filteredCases.map((c) => (
                             <div
                                 key={c.id}
-                                className="group relative bg-white dark:bg-[#141414] border border-gray-100 dark:border-white/5 rounded-2xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-all duration-300 hover:border-indigo-500/30 animate-slide-up"
+                                className="group relative bg-white dark:bg-[#141414] border border-gray-100 dark:border-white/5 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 hover:border-indigo-500/30 animate-slide-up"
                             >
+                              <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-4 flex-1">
                                     <div className={`w-1 h-8 rounded-full ${c.status === 'Closed' ? 'bg-emerald-500' :
                                         c.status === 'SO' ? 'bg-amber-500' :
@@ -1119,14 +1128,6 @@ const CaseTrackerTab = () => {
                                                             Transferred: {c.transferValidation}
                                                         </span>
                                                     )}
-                                                    {/* Compact Note Snippet */}
-                                                    {c.comments && (
-                                                        <div className="flex items-center px-2 py-1 bg-indigo-50/50 dark:bg-indigo-500/10 rounded-lg border border-indigo-100/30 dark:border-indigo-500/10 max-w-[150px]" title={c.comments}>
-                                                            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium italic truncate">
-                                                                "{c.comments}"
-                                                            </span>
-                                                        </div>
-                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -1147,6 +1148,28 @@ const CaseTrackerTab = () => {
                                                 : ''}
                                         </p>
                                     </div>
+
+                                    {/* Notes toggle — always visible (not hover-only) so it works on touch screens too */}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleNotes(c.id)}
+                                        aria-expanded={expandedNotes.has(c.id)}
+                                        title={c.comments?.trim() ? 'View notes' : 'No notes'}
+                                        className={clsx(
+                                            'relative flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors',
+                                            expandedNotes.has(c.id)
+                                                ? 'bg-indigo-500 text-white'
+                                                : c.comments?.trim()
+                                                    ? 'text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10'
+                                                    : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10'
+                                        )}
+                                    >
+                                        <ChatBubbleBottomCenterTextIcon className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Notes</span>
+                                        {c.comments?.trim() && !expandedNotes.has(c.id) && (
+                                            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500" />
+                                        )}
+                                    </button>
 
                                     <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         {editingCaseId === c.id ? (
@@ -1187,6 +1210,10 @@ const CaseTrackerTab = () => {
                                         )}
                                     </div>
                                 </div>
+                              </div>
+                                {expandedNotes.has(c.id) && editingCaseId !== c.id && (
+                                    <CaseNotes notes={c.comments} className="mt-3 ml-5" />
+                                )}
                             </div>
                         ))}
                     </div>
@@ -1492,17 +1519,8 @@ const CaseTrackerTab = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Important Notes Display */}
-                                                {c.comments && (
-                                                    <div className="col-span-full mt-2 bg-indigo-500/[0.03] dark:bg-indigo-500/[0.05] rounded-xl p-3 border border-indigo-500/10 dark:border-indigo-500/10 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                                        <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1.5 flex items-center">
-                                                            Important Notes
-                                                        </p>
-                                                        <p className="text-[11px] text-gray-600 dark:text-gray-400 leading-relaxed italic">
-                                                            "{c.comments}"
-                                                        </p>
-                                                    </div>
-                                                )}
+                                                {/* Important Notes Display (SPII-masked; empty state when none) */}
+                                                <CaseNotes notes={c.comments} className="col-span-full mt-2" />
                                             </div>
                                         )}
                                     </div>

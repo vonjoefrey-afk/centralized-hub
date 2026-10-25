@@ -674,7 +674,10 @@ export const addTrackedCase = async (userId, caseData, teamId) => {
             transferValidation: caseData.transferValidation || '',
             surveyStatus: caseData.surveyStatus || 'N/A',
             isChatContinued: caseData.isChatContinued || null,
-            irt: caseData.irt || '', 
+            irt: caseData.irt || '',
+            irtType: caseData.irtType || '',
+            // Case notes — previously dropped on create, so only edited cases kept them.
+            comments: (caseData.comments || '').trim(),
             createdAt: (() => {
                 if (!caseData.customDate) return serverTimestamp();
                 
