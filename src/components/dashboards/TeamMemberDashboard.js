@@ -731,6 +731,8 @@ const TeamMemberDashboard = () => {
         onNavigate={setActiveTab}
         onSignOut={handleSignOut}
         onChangePassword={() => setShowChangePasswordModal(true)}
+        // Case Tracker is a form + card ledger: let it use the full width.
+        fullWidth={activeTab === 'case-tracker'}
         topCenter={<div className="max-w-2xl mx-auto w-full"><FocusTimer /></div>}
         topRight={(
           <>
