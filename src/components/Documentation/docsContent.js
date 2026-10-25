@@ -286,7 +286,7 @@ export const DOCS = [
         problem:
           'Someone has to own the source of truth for who exists, what role they hold, and what features they can use.',
         howItWorks:
-          'Admins view every user and can change roles, toggle per-user feature flags, reset passwords, update auth emails, and remove users. Sensitive operations run through role-checked Cloud Functions.',
+          'Admins view every user and can change roles, toggle per-user feature flags, reset passwords, update auth emails, and remove users. The headcount cards (Total Users, Admins, Teams, Members, Assigned) appear at the top of this tab only — not on other admin tabs — and clicking one filters the user list. Sensitive operations run through role-checked Cloud Functions.',
         solution:
           'The org\'s access model is centrally and safely administered, with privileged actions verified server-side.',
       },
@@ -376,7 +376,7 @@ export const DOCS = [
         problem:
           'Admins had no visibility into how the app is actually used per person — who is online, how long they are active, which tabs they rely on, and how much case work they log.',
         howItWorks:
-          'While a user is signed in, the app records lightweight activity to Firestore: a session heartbeat accrues active (visible, non-idle) time, and each tab they open is logged. The admin-only monitor reads this live and joins it with tracked-case data to show, per user: LDAP, online status, active time, last tab clicked, most-used tab, case count, and when they last recorded a case — plus interactive charts and an append-only audit trail with CSV export. A Utilization Rate gauge expresses active time as a share of the shift (selectable: 9, 9.5, 10.5, 11 hours, or a custom length); it can show the team average or be scoped to a single user, and each user\'s own utilization also appears as a column in the table. Access is restricted to admins by Firestore Security Rules; each user can only write their own activity.',
+          'While a user is signed in, the app records lightweight activity to Firestore: a session heartbeat accrues active (visible, non-idle) time, and each tab they open is logged. The admin-only monitor reads this live and joins it with tracked-case data to show, per user: LDAP, online status, active time, last tab clicked, most-used tab, case count, and when they last recorded a case — plus interactive charts and an append-only audit trail with CSV export. A Utilization Rate gauge expresses active time as a share of the shift (selectable: 9, 9.5, 10.5, 11 hours, or a custom length); it can show the team average or be scoped to a single user, and each user\'s own utilization also appears as a column in the table. The tab uses the full screen width: on wide screens the six charts flow three (or, at 2200px and wider, all six) to a row, and the user table and audit trail sit side by side, so the whole picture needs far less scrolling. Access is restricted to admins by Firestore Security Rules; each user can only write their own activity.',
         solution:
           'Leadership gets a real-time, per-user picture of app utilization and an accountable audit trail, without anyone having to self-report.',
       },

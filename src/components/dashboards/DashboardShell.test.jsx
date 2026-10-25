@@ -96,6 +96,15 @@ describe('DashboardShell sidebar (desktop)', () => {
     expect(onNavigate).toHaveBeenCalledWith('case-tracker');
   });
 
+  it('caps content width by default and drops the cap with fullWidth', () => {
+    renderShell();
+    expect(document.querySelector('main').className).toContain('max-w-[1400px]');
+    cleanup();
+    renderShell({ fullWidth: true });
+    expect(document.querySelector('main').className).toContain('max-w-none');
+    expect(document.querySelector('main').className).not.toContain('max-w-[1400px]');
+  });
+
   it('survives localStorage being unavailable', () => {
     const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     renderShell();

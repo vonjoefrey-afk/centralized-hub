@@ -709,8 +709,11 @@ const AdminDashboard = () => {
         onSignOut={handleSignOut}
         onChangePassword={() => setShowChangePasswordModal(true)}
         onRefresh={handleRefresh}
+        // App Utilization is dashboard-dense: let it use the full width.
+        fullWidth={activeTab === 'utilization'}
       >
-        {/* Statistics Cards — click to drill into User Management, filtered */}
+        {/* Statistics Cards — User Management only; click to filter the user list */}
+        {activeTab === 'users' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-10">
           <StatCard icon={UserGroupIcon} label="Total Users" value={stats.totalUsers}
             gradient="from-indigo-500 to-cyan-500 shadow-indigo-500/20"
@@ -733,6 +736,7 @@ const AdminDashboard = () => {
             glow="from-amber-50/50 to-orange-50/50 dark:from-amber-500/10 dark:to-orange-500/10"
             active={activeTab === 'users' && userFilter === 'assigned'} onClick={() => goToUsers('assigned')} title="View users assigned to a team" />
         </div>
+        )}
 
         {/* Tab Content */}
         {activeTab === 'users' && (
