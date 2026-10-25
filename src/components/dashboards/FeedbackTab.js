@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { logger } from '../../utils/logger';
 
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { Badge, Skeleton, CardSkeleton, EmptyState, PremiumSelect, Button, Modal } from '../ui';
 import {
@@ -11,10 +12,11 @@ import {
   MagnifyingGlassIcon,
   BugAntIcon,
   ClipboardDocumentCheckIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { DASHBOARD_LABELS, ALL_FEATURE_COLUMNS } from '../../constants/dashboardFeatures';
 import { downloadCsv } from '../../utils/csv';
-import { BUG_STATUSES, BUG_STATUS_LABEL, updateBugFeedbackStatus } from '../../services/feedback';
+import { BUG_STATUSES, BUG_STATUS_LABEL, updateBugFeedbackStatus, saveFeedbackAnalysis } from '../../services/feedback';
 import { showSuccess, showError } from '../../utils/toast';
 
 const BUG_STATUS_BADGE = {
@@ -50,6 +52,13 @@ const getFeedbackSummary = (item) => {
   return item.message || '';
 };
 
+const Meta = ({ label, value }) => (
+  <div>
+    <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</div>
+    <div className="text-sm font-semibold text-gray-800 dark:text-gray-200 break-words">{value || '—'}</div>
+  </div>
+);
+
 const FeedbackTab = () => {
   const { user } = useAuth();
   const [feedback, setFeedback] = useState([]);
@@ -63,6 +72,44 @@ const FeedbackTab = () => {
   const [selStatus, setSelStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
+
+  // Detail + AI analysis modal
+  const [detailModal, setDetailModal] = useState({ open: false, item: null });
+  const [analyzing, setAnalyzing] = useState(false);
+
+  const openDetailModal = (item) => setDetailModal({ open: true, item });
+  const closeDetailModal = () => setDetailModal({ open: false, item: null });
+
+  const runAnalysis = async () => {
+    const item = detailModal.item;
+    if (!item) return;
+    setAnalyzing(true);
+    try {
+      const analyze = httpsCallable(functions, 'analyzeFeedback');
+      const res = await analyze({
+        type: item.type, title: item.title, message: item.message,
+        featureStatuses: item.featureStatuses, role: item.role, page: item.page,
+      });
+      const analysis = res.data?.analysis;
+      if (!analysis) throw new Error('No analysis returned');
+      await saveFeedbackAnalysis(item.id, analysis, user?.uid);
+      setFeedback((prev) => prev.map((f) => (f.id === item.id ? { ...f, aiAnalysis: analysis } : f)));
+      setDetailModal((m) => ({ ...m, item: { ...m.item, aiAnalysis: analysis } }));
+      showSuccess('AI analysis complete');
+    } catch (err) {
+      logger.error('Feedback analysis failed:', err);
+      showError(err.message || 'AI analysis failed');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const copyPrompt = (text) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text)
+      .then(() => showSuccess('Prompt copied'))
+      .catch(() => showError('Could not copy'));
+  };
 
   const openStatusModal = (item) => {
     setSelStatus(item.bugStatus || 'checking');
@@ -251,7 +298,7 @@ const FeedbackTab = () => {
                 </tr>
               ) : (
                 filteredFeedback.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors duration-200">
+                  <tr key={item.id} onClick={() => openDetailModal(item)} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors duration-200">
                     <td className="px-8 py-6">
                       <Badge
                         variant={item.type === 'bug' ? 'error' : 'info'}
@@ -290,7 +337,7 @@ const FeedbackTab = () => {
                     <td className="px-8 py-6">
                       {item.type === 'bug' ? (
                         <button
-                          onClick={() => openStatusModal(item)}
+                          onClick={(e) => { e.stopPropagation(); openStatusModal(item); }}
                           className="flex items-center gap-2 group/status"
                           title="Update bug status"
                         >
@@ -377,6 +424,109 @@ const FeedbackTab = () => {
             Save &amp; Notify
           </Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* Feedback detail + AI triage modal */}
+      <Modal isOpen={detailModal.open} onClose={closeDetailModal} size="xl">
+        <Modal.Header onClose={closeDetailModal}>
+          <Modal.Title>
+            <span className="inline-flex items-center gap-2">
+              <Badge variant={detailModal.item?.type === 'bug' ? 'error' : 'info'} size="sm" className="uppercase tracking-widest font-black">
+                {detailModal.item?.type === 'bug' ? 'Bug' : 'UAT'}
+              </Badge>
+              {detailModal.item?.title || 'Feedback'}
+            </span>
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="space-y-5">
+          {detailModal.item && (() => {
+            const d = detailModal.item;
+            const a = d.aiAnalysis;
+            return (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <Meta label="Submitted by" value={d.userName} />
+                  <Meta label="Email" value={d.userEmail} />
+                  <Meta label="Dashboard" value={DASHBOARD_LABELS[d.role] || d.role} />
+                  <Meta label="Submitted" value={d.createdAt?.toDate?.()?.toLocaleString()} />
+                  {d.page && <Meta label="Page" value={d.page} />}
+                  {d.type === 'bug' && <Meta label="Bug status" value={BUG_STATUS_LABEL[d.bugStatus] || 'Not set'} />}
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1.5">Details</h4>
+                  {d.type === 'uat' && d.featureStatuses ? (
+                    <div className="space-y-2">
+                      {Object.values(d.featureStatuses).map((f, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm">
+                          <Badge variant={f.status === 'not_working' ? 'error' : 'success'} size="sm" className="mt-0.5 flex-shrink-0">
+                            {f.status === 'not_working' ? 'Not working' : 'Working'}
+                          </Badge>
+                          <div>
+                            <span className="font-bold text-gray-800 dark:text-gray-200">{f.label}</span>
+                            {f.note ? <p className="text-gray-600 dark:text-gray-400">{f.note}</p> : null}
+                          </div>
+                        </div>
+                      ))}
+                      {d.message && <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap mt-2">{d.message}</p>}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{d.message || '—'}</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/40 dark:bg-indigo-500/5 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                      <SparklesIcon className="w-4 h-4" /> AI Triage
+                    </h4>
+                    <button
+                      onClick={runAnalysis}
+                      disabled={analyzing}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50"
+                    >
+                      {analyzing ? 'Analyzing…' : a ? 'Re-analyze' : 'Analyze with AI'}
+                    </button>
+                  </div>
+
+                  {!a && !analyzing && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Use AI to judge whether this is fixable and generate a plan plus a ready-to-paste prompt for a coding agent.
+                    </p>
+                  )}
+
+                  {a && (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={a.fixable === 'yes' ? 'success' : a.fixable === 'no' ? 'gray' : 'warning'} size="sm">Fixable: {a.fixable}</Badge>
+                        <Badge variant={a.severity === 'high' ? 'error' : a.severity === 'low' ? 'gray' : 'warning'} size="sm">Severity: {a.severity}</Badge>
+                        <Badge variant="info" size="sm">Area: {a.area}</Badge>
+                      </div>
+                      {a.summary && <p className="text-sm text-gray-700 dark:text-gray-200">{a.summary}</p>}
+                      {a.plan?.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">Plan</h5>
+                          <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                            {a.plan.map((step, i) => <li key={i}>{step}</li>)}
+                          </ol>
+                        </div>
+                      )}
+                      {a.agentPrompt && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <h5 className="text-xs font-black uppercase tracking-widest text-gray-400">Agent prompt</h5>
+                            <button onClick={() => copyPrompt(a.agentPrompt)} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">Copy</button>
+                          </div>
+                          <pre className="text-xs whitespace-pre-wrap bg-white dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg p-3 text-gray-800 dark:text-gray-200 max-h-56 overflow-y-auto">{a.agentPrompt}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </Modal.Body>
       </Modal>
     </div>
   );

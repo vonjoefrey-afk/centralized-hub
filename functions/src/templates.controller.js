@@ -2,6 +2,7 @@ const functions = require("firebase-functions");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const mammoth = require("mammoth");
 const xlsx = require("xlsx");
+const { GEMINI_MODEL } = require("./gemini");
 
 exports.extractTemplatesFromFile = async (data, context) => {
   // Authentication check
@@ -22,7 +23,7 @@ exports.extractTemplatesFromFile = async (data, context) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
     // The prompt instructs Gemini to return a strict JSON array
     const prompt = `

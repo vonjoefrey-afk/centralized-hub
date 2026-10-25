@@ -39,6 +39,15 @@ export const BUG_STATUSES = [
 
 export const BUG_STATUS_LABEL = Object.fromEntries(BUG_STATUSES.map((s) => [s.value, s.label]));
 
+/** Cache an AI triage result on the feedback doc so it persists and is re-runnable. */
+export const saveFeedbackAnalysis = async (feedbackId, analysis, adminUid) => {
+  await updateDoc(doc(db, 'feedback', feedbackId), {
+    aiAnalysis: analysis,
+    aiAnalyzedAt: serverTimestamp(),
+    aiAnalyzedBy: adminUid || null,
+  });
+};
+
 /**
  * Admin action from the User Feedback tab: set a bug report's workflow status,
  * always notify the person who submitted it, and — when marked Fixed-Bug —
