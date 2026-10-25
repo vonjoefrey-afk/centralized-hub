@@ -1,8 +1,19 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
+import { findTypeaheadMatch } from '../../utils/typeahead';
+
+// Keys typed within this window are combined ("s" then "e" → "se").
+const TYPEAHEAD_RESET_MS = 700;
+
+const optValueOf = (opt) => (typeof opt === 'string' ? opt : opt.value);
+const optLabelOf = (opt) => (typeof opt === 'string' ? opt : opt.label);
+const optTextOf = (opt) => {
+  const label = optLabelOf(opt);
+  return typeof label === 'string' || typeof label === 'number' ? String(label) : String(optValueOf(opt) ?? '');
+};
 
 /**
  * PremiumSelect Component
@@ -10,6 +21,11 @@ import { AnimatePresence, motion } from 'framer-motion';
  * A high-end, glassmorphic dropdown/select component designed for premium UIs.
  * Uses a React Portal to render the dropdown at document body level, fully
  * escaping any parent stacking context created by backdrop-filter or transform.
+ *
+ * Keyboard (like a native <select>): with the trigger focused, type letters to
+ * jump to the matching option ("s", "se" → "SEK"; repeat a letter to cycle),
+ * ↑/↓/Home/End/PageUp/PageDown move the highlight, Enter or Space picks it,
+ * Escape or Tab closes. Focus stays on the trigger (aria-activedescendant).
  */
 const PremiumSelect = ({
   label,
@@ -25,8 +41,16 @@ const PremiumSelect = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState({});
+  const [highlight, setHighlight] = useState(-1);
+  const [listMaxHeight, setListMaxHeight] = useState(256);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
+  const optionRefs = useRef([]);
+  const typeahead = useRef({ buffer: '', at: 0 });
+  const baseId = useId();
+  const listboxId = `${baseId}-listbox`;
+  const optionId = (i) => `${baseId}-opt-${i}`;
+  const selectedIndex = options.findIndex((opt) => optValueOf(opt) === value);
 
   const sizes = {
     sm: 'px-2 py-1 text-[10px] rounded-lg',
@@ -41,7 +65,10 @@ const PremiumSelect = ({
     const rect = triggerRef.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    const openUpward = spaceBelow < 220 && spaceAbove > spaceBelow;
+    const MENU_MAX = 256; // matches the former max-h-64
+    const openUpward = spaceBelow < MENU_MAX + 16 && spaceAbove > spaceBelow;
+    // Never let the list run past the window edge: shrink it to the space available.
+    setListMaxHeight(Math.max(120, Math.min(MENU_MAX, (openUpward ? spaceAbove : spaceBelow) - 16)));
 
     setMenuStyle({
       position: 'fixed',
@@ -56,9 +83,84 @@ const PremiumSelect = ({
     });
   }, [align]);
 
+  const openMenu = (initialHighlight = selectedIndex) => {
+    computePosition();
+    setHighlight(initialHighlight);
+    setIsOpen(true);
+  };
+
   const handleOpen = () => {
-    if (!isOpen) computePosition();
-    setIsOpen(prev => !prev);
+    if (isOpen) setIsOpen(false);
+    else openMenu();
+  };
+
+  const choose = (index) => {
+    const opt = options[index];
+    if (opt === undefined) return;
+    onChange(optValueOf(opt));
+    setIsOpen(false);
+  };
+
+  // Keep the highlighted option visible while moving through a long list.
+  useEffect(() => {
+    if (isOpen && highlight >= 0) optionRefs.current[highlight]?.scrollIntoView?.({ block: 'nearest' });
+  }, [isOpen, highlight]);
+
+  const handleKeyDown = (e) => {
+    if (!options.length) return;
+    const last = options.length - 1;
+    const move = (to) => {
+      e.preventDefault();
+      if (!isOpen) openMenu(Math.min(Math.max(to, 0), last));
+      else setHighlight(Math.min(Math.max(to, 0), last));
+    };
+    const from = isOpen ? highlight : selectedIndex;
+
+    switch (e.key) {
+      case 'ArrowDown': return move(from < 0 ? 0 : from + 1);
+      case 'ArrowUp': return move(from < 0 ? last : from - 1);
+      case 'Home': return move(0);
+      case 'End': return move(last);
+      case 'PageDown': return move((from < 0 ? 0 : from) + 10);
+      case 'PageUp': return move((from < 0 ? 0 : from) - 10);
+      case 'Enter':
+        e.preventDefault();
+        if (isOpen && highlight >= 0) choose(highlight);
+        else if (isOpen) setIsOpen(false);
+        else openMenu();
+        return;
+      case ' ':
+        // Space types a space while a typeahead word is in progress; otherwise it picks/opens.
+        if (typeahead.current.buffer && Date.now() - typeahead.current.at < TYPEAHEAD_RESET_MS) break;
+        e.preventDefault();
+        if (isOpen && highlight >= 0) choose(highlight);
+        else if (!isOpen) openMenu();
+        return;
+      case 'Escape':
+        if (isOpen) { e.preventDefault(); e.stopPropagation(); setIsOpen(false); }
+        return;
+      case 'Tab':
+        if (isOpen) setIsOpen(false);
+        return;
+      default:
+        break;
+    }
+
+    // Type-to-select: printable characters without Ctrl/Alt/Meta.
+    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      const now = Date.now();
+      const t = typeahead.current;
+      t.buffer = now - t.at < TYPEAHEAD_RESET_MS ? t.buffer + e.key : e.key;
+      t.at = now;
+      const match = findTypeaheadMatch(options.map(optTextOf), t.buffer, from);
+      if (match >= 0) {
+        if (!isOpen) openMenu(match);
+        else setHighlight(match);
+      } else if (!isOpen) {
+        openMenu();
+      }
+    }
   };
 
   // Close on outside click / scroll
@@ -103,8 +205,12 @@ const PremiumSelect = ({
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
+        onKeyDown={handleKeyDown}
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-activedescendant={isOpen && highlight >= 0 ? optionId(highlight) : undefined}
         className={clsx(
           'flex items-center justify-between w-full transition-all duration-300',
           'bg-white/70 dark:bg-white/5 border border-gray-100 dark:border-white/10 backdrop-blur-md',
@@ -140,6 +246,7 @@ const PremiumSelect = ({
               exit={{ opacity: 0, y: 4, scale: 0.97 }}
               transition={{ duration: 0.14, ease: 'easeOut' }}
               style={menuStyle}
+              id={listboxId}
               role="listbox"
               className={clsx(
                 'rounded-2xl overflow-hidden shadow-2xl shadow-black/30 dark:shadow-black/70',
@@ -147,32 +254,39 @@ const PremiumSelect = ({
                 menuClassName
               )}
             >
-              <div className="py-1.5 max-h-64 overflow-y-auto">
+              <div className="py-1.5 overflow-y-auto" style={{ maxHeight: listMaxHeight }}>
                 {options.length === 0 ? (
                   <div className="px-4 py-3 text-xs font-bold text-gray-400 uppercase text-center tracking-widest">
                     No options
                   </div>
                 ) : (
                   options.map((opt, idx) => {
-                    const optValue = typeof opt === 'string' ? opt : opt.value;
-                    const optLabel = typeof opt === 'string' ? opt : opt.label;
-                    const isActive = optValue === value;
+                    const optLabel = optLabelOf(opt);
+                    const isActive = optValueOf(opt) === value;
+                    const isHighlighted = idx === highlight;
 
                     return (
                       <button
                         key={idx}
+                        ref={(el) => { optionRefs.current[idx] = el; }}
+                        id={optionId(idx)}
                         type="button"
                         role="option"
+                        tabIndex={-1}
                         aria-selected={isActive}
+                        onMouseDown={(e) => e.preventDefault() /* keep focus on the trigger */}
+                        onMouseEnter={() => setHighlight(idx)}
                         onClick={() => {
-                          onChange(optValue);
-                          setIsOpen(false);
+                          choose(idx);
+                          triggerRef.current?.focus();
                         }}
                         className={clsx(
                           'w-full flex items-center px-4 py-2.5 text-sm font-semibold transition-all duration-150 text-left',
                           isActive
                             ? 'bg-indigo-600/10 text-indigo-600 dark:text-indigo-400'
-                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
+                            : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white',
+                          isHighlighted && !isActive && 'bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white',
+                          isHighlighted && isActive && 'ring-2 ring-inset ring-indigo-500/40'
                         )}
                       >
                         <span className="flex-1 truncate">{optLabel}</span>

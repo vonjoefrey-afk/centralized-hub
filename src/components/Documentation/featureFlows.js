@@ -152,11 +152,16 @@ export const FEATURE_FLOWS = {
   M -->|No| P(["Done"])`,
 
   'team-member:gcp-billing': `flowchart TD
-  A(["Open GCP Billing"]) --> B[/"Enter inputs"/]
-  B --> C["Calculator computes result"]
-  C --> D{"Recalculate?"}
-  D -->|Yes| B
-  D -->|No| E(["Result ready"])`,
+  A(["Open GCP Billing"]) --> B[/"Restricted country? Policy?"/]
+  B --> C{"Policy"}
+  C -->|Runaway| D["Runaway Spend matrix sets %, cap $1M"]
+  C -->|TPA or Other| E["Agent picks eligibility %"]
+  D --> F[/"Pre-checks and adjustment details"/]
+  E --> F
+  F --> G{"Issue resolved?"}
+  G -->|No| H(["Warn: do not proceed"])
+  G -->|Yes| I["Build subject (+#RCAdj if restricted and ≤ $5k) and consult"]
+  I --> J(["Copy subject / consult"])`,
 
   'team-member:notes': `flowchart TD
   A(["Open Documents"]) --> B{"Have a document?"}
