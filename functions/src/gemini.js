@@ -31,7 +31,9 @@ function isModelUnavailable(err) {
  * @returns {Promise<{ text: string, model: string }>}
  */
 async function generateJson(apiKey, contents) {
-  const genAI = new GoogleGenerativeAI(apiKey);
+  // Guard against a stray newline/space in the stored secret, which Google
+  // rejects as API_KEY_INVALID even when the key itself is correct.
+  const genAI = new GoogleGenerativeAI(String(apiKey || "").trim());
   const run = async (name) => {
     const model = genAI.getGenerativeModel({ model: name });
     const response = await model.generateContent({
