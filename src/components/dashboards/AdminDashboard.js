@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { signIn, signUp, signOutUser, onAuthStateChange, resetUserPassword, deleteUserFromAuth, updateAuthEmail } from '../../firebase/auth';
+import { signOutUser, onAuthStateChange, resetUserPassword, deleteUserFromAuth } from '../../firebase/auth';
 import { getAllTeams, addUserToTeam, getTeam, adminMoveUserToTeam } from '../../services/teams';
 import { getAllUsers, updateUserRole, getPendingTeamLeaders, approveTeamLeader, rejectTeamLeader, deleteUserCompletely, updateUserFeatures, updateUserProfile, createProvisionedUser, getProvisionedUsers, deleteProvisionedUser } from '../../services/users';
 import { getUpdateAcknowledgmentBreakdown, deleteUpdates } from '../../services/updates';
@@ -91,7 +91,7 @@ const AdminDashboard = () => {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [featuresModal, setFeaturesModal] = useState({ isOpen: false, user: null, loading: false });
   const [changeTeamModal, setChangeTeamModal] = useState({ isOpen: false, user: null, selectedTeamId: '', loading: false });
-  const [editProfileModal, setEditProfileModal] = useState({ isOpen: false, user: null, displayName: '', ssoEmail: '', isCoAdmin: false, loading: false });
+  const [editProfileModal, setEditProfileModal] = useState({ isOpen: false, user: null, displayName: '', isCoAdmin: false, loading: false });
   const [allTeams, setAllTeams] = useState([]);
   const [updates, setUpdates] = useState([]);
   const [statusBreakdown, setStatusBreakdown] = useState({});
@@ -532,7 +532,6 @@ const AdminDashboard = () => {
       user,
       displayName: user.displayName || '',
       email: user.email || '',
-      ssoEmail: user.ssoEmail || '',
       isCoAdmin: user.isCoAdmin || false,
       loading: false
     });
@@ -542,29 +541,14 @@ const AdminDashboard = () => {
     e.preventDefault();
     setEditProfileModal(prev => ({ ...prev, loading: true }));
     try {
-      const { user: targetUser, displayName, email, ssoEmail, isCoAdmin } = editProfileModal;
-      
-      // 1. Update Firestore profile first
+      const { user: targetUser, displayName, email, isCoAdmin } = editProfileModal;
+
+      // Update the Firestore profile.
       await updateUserProfile(targetUser.id, {
         displayName,
         email,
-        ssoEmail,
         isCoAdmin
       });
-
-      // 2. If email or ssoEmail is @google.com and has changed, sync to Auth
-      const needsAuthSync = (email !== targetUser.email) || (ssoEmail !== targetUser.ssoEmail);
-      const targetAuthEmail = ssoEmail || email;
-
-      if (needsAuthSync && targetAuthEmail && targetAuthEmail.endsWith('@google.com')) {
-        try {
-          await updateAuthEmail(targetUser.id, targetAuthEmail);
-          logger.info(`Successfully synced ${targetAuthEmail} into Firebase Auth for migration.`);
-        } catch (authError) {
-          logger.warn("Auth sync failed. Email might already be bound or service is unavailable.", authError);
-          showError(`Profile saved, but Auth sync failed: ${authError.message}`);
-        }
-      }
 
       showSuccess(`Profile for ${displayName} updated successfully`);
       setEditProfileModal(prev => ({ ...prev, isOpen: false, loading: false }));
@@ -833,20 +817,18 @@ const AdminDashboard = () => {
                   <div className="hidden md:block">
                     <table className="w-full divide-y divide-gray-200/50 dark:divide-white/5 table-fixed">
                       <colgroup>
+                        <col style={{width:'16%'}} />
+                        <col style={{width:'22%'}} />
+                        <col style={{width:'11%'}} />
+                        <col style={{width:'13%'}} />
+                        <col style={{width:'13%'}} />
+                        <col style={{width:'10%'}} />
                         <col style={{width:'15%'}} />
-                        <col style={{width:'18%'}} />
-                        <col style={{width:'10%'}} />
-                        <col style={{width:'10%'}} />
-                        <col style={{width:'12%'}} />
-                        <col style={{width:'12%'}} />
-                        <col style={{width:'9%'}} />
-                        <col style={{width:'14%'}} />
                       </colgroup>
                       <thead className="bg-gray-50/50 dark:bg-[#0a0a0a]/50 backdrop-blur-md border-b border-gray-200/50 dark:border-white/5">
                         <tr>
                           <th className="px-5 py-4 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">User</th>
                           <th className="px-3 py-4 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Email</th>
-                          <th className="px-2 py-4 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">SSO Status</th>
                           <th className="px-2 py-4 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Role</th>
                           <th className="px-2 py-4 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Change Role</th>
                           <th className="px-2 py-4 text-left text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Team</th>
@@ -878,17 +860,6 @@ const AdminDashboard = () => {
                           {/* Email */}
                           <td className="px-3 py-3">
                             <div className="text-xs text-gray-500 truncate" title={userData.email}>{userData.email}</div>
-                          </td>
-                          {/* SSO Migrated */}
-                          <td className="px-2 py-3">
-                            {(() => {
-                              const isMigrated = userData.ssoMigrated || (userData.email && userData.email.endsWith('@google.com')) || (userData.providerData && userData.providerData.some(p => p.providerId === 'google.com'));
-                              return (
-                                <Badge variant={isMigrated ? 'success' : 'gray'} size="sm" className="shadow-sm">
-                                  {isMigrated ? 'Migrated' : 'Pending'}
-                                </Badge>
-                              );
-                            })()}
                           </td>
                           {/* Role badge */}
                           <td className="px-2 py-3">
@@ -1043,17 +1014,6 @@ const AdminDashboard = () => {
                             {userData.createdAt?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) || 'Unknown'}
                           </span>
                         </div>
-                        <div className="flex items-center">
-                          <span className="text-gray-500 mr-2">SSO Migrated: </span>
-                          {userData.ssoMigrated || (userData.email && userData.email.endsWith('@google.com')) || (userData.providerData && userData.providerData.some(p => p.providerId === 'google.com')) ? (
-                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </div>
-
                         <div className="pt-2 border-t border-gray-200">
                           <PremiumSelect
                             size="sm"
@@ -1738,23 +1698,6 @@ const AdminDashboard = () => {
                   placeholder="user@google.com"
                   disabled={editProfileModal.loading}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SSO Email (@google.com)
-                </label>
-                <input
-                  type="email"
-                  value={editProfileModal.ssoEmail}
-                  onChange={(e) => setEditProfileModal(prev => ({ ...prev, ssoEmail: e.target.value }))}
-                  className="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition-shadow transition-colors"
-                  placeholder="Optional. Will mark user as SSO Migrated."
-                  disabled={editProfileModal.loading}
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                   This email will be hard-linked to the user's Google SSO identity during migration.
-                </p>
               </div>
 
               {/* Co-Admin Role Assigner Toggle */}

@@ -25,7 +25,6 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   GoogleAuthProvider,
-  linkWithPopup,
   signInWithPopup
 } from 'firebase/auth';
 import {
@@ -678,89 +677,6 @@ export const deleteUserFromAuth = async (userId) => {
   }
 };
 
-/**
- * Update user email in Firebase Authentication
- * 
- * This function calls a Cloud Function to update a user's Authentication email.
- * This ensures that when they sign in with Google SSO using this new email,
- * Firebase Auth natively ties them to this existing UID instead of creating a duplicate.
- * 
- * @param {string} userId - The UID of the user
- * @param {string} newEmail - The new email address (usually @google.com)
- * @returns {Promise<Object>} Success status and message
- */
-export const updateAuthEmail = async (userId, newEmail) => {
-  try {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('User must be authenticated to update emails');
-
-    const idToken = await currentUser.getIdToken();
-    const functionsUrl = import.meta.env.REACT_APP_FUNCTIONS_URL?.replace('resetUserPassword', 'updateUserAuthEmail') ||
-      'https://asia-southeast1-centralized-gcp.cloudfunctions.net/updateUserAuthEmail';
-
-    if (functionsUrl) {
-      const response = await fetch(functionsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({ userId, newEmail }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || data.message || 'Failed to update user auth email');
-      }
-
-      return { success: true, message: 'User Auth Email updated successfully' };
-    } else {
-      throw new Error('Cloud Function URL not configured.');
-    }
-  } catch (error) {
-    logger.error('Error in updateAuthEmail:', error);
-    throw error;
-  }
-};
-
-/**
- * Link Google Account
- * 
- * Links the current user's account with a Google account.
- * This allows the user to sign in with Google in the future while retaining their existing data.
- * 
- * @returns {Promise<Object>} The result of the linking operation
- */
-export const linkGoogleAccount = async () => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No user is currently signed in');
-    }
-
-    const provider = new GoogleAuthProvider();
-    const result = await linkWithPopup(user, provider);
-
-    // Mark user as SSO migrated in Firestore
-    await updateDoc(doc(db, 'users', user.uid), {
-      ssoMigrated: true
-    });
-
-    // Trigger auth state change to update UI with new provider data
-    await triggerAuthStateChange();
-
-    return {
-      success: true,
-      user: result.user
-    };
-  } catch (error) {
-    logger.error('Error linking Google account:', error);
-    if (error.code === 'auth/credential-already-in-use') {
-      throw new Error('This Google account is already associated with another user.');
-    }
-    throw error;
-  }
-};
 /**
  * Sign in with Google
  * 
