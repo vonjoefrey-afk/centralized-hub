@@ -49,12 +49,22 @@ export const DOCS = [
           'Records stay consistent without manual effort, and time-based notifications fire on their own so nothing is forgotten.',
       },
       {
+        id: 'navigation-sidebar',
+        name: 'Collapsible Navigation Sidebar',
+        problem:
+          'Navigation lived in a drawer that covered the page, so switching tabs always took two clicks and hid the work underneath — and on wide screens there was no way to keep the menu visible without losing space.',
+        howItWorks:
+          'On desktop (1024px and wider) every dashboard docks its navigation as a sidebar beside the content. The ☰ button in the app bar — or the chevron at the bottom of the sidebar — collapses it to a slim icon-only rail; hovering or keyboard-focusing an icon shows its name in a tooltip, and badge counts stay visible. The content area slides over to use the freed space. The expanded/collapsed choice is remembered in the browser (localStorage) and restored on the next visit. On smaller screens ☰ still opens the slide-in drawer, which now takes keyboard focus when it opens, keeps Tab inside it, closes with Escape, and returns focus to ☰. All controls are reachable by keyboard with visible focus rings, the current tab is announced as the current page, and the toggles report whether the menu is expanded.',
+        solution:
+          'People choose between a labelled menu and maximum screen space, keep that choice across sessions, and can navigate entirely by keyboard or screen reader.',
+      },
+      {
         id: 'quick-access',
         name: 'Quick-Access Shortcuts',
         problem:
           'Reaching a frequently-used tab meant opening the navigation drawer and finding it every single time, adding friction to routine work.',
         howItWorks:
-          'Every dashboard\'s navigation drawer shows a star on each tab. Tapping it pins that tab, and pinned tabs appear as one-click pill buttons in a "Quick access" bar directly beneath the top app bar — so switching to them no longer requires opening the drawer. Each person\'s picks are saved per user (in the browser) and persist across reloads; the same shortcut mechanism is shared by all four dashboards.',
+          'Every dashboard\'s navigation menu (the expanded sidebar on desktop, the drawer on mobile) shows a star on each tab. Tapping it pins that tab, and pinned tabs appear as one-click pill buttons in a "Quick access" bar directly beneath the top app bar — so switching to them no longer requires opening the drawer. Each person\'s picks are saved per user (in the browser) and persist across reloads; the same shortcut mechanism is shared by all four dashboards.',
         solution:
           'The tabs each person uses most stay one click away, removing repetitive navigation without cluttering the interface for anyone else.',
       },
