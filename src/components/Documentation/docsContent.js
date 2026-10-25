@@ -376,9 +376,9 @@ export const DOCS = [
         problem:
           'Bug reports and UAT results from across the org need one triage surface, and results need to be exportable for review.',
         howItWorks:
-          'All submissions stream into a filterable table (by type and dashboard). Export produces a CSV with one column per feature, so a UAT pass shows Working / the failure reason per feature.',
+          'All submissions stream into a filterable table (by type and dashboard). Clicking a row opens a detail view with the full submission (no truncation), including per-feature UAT results. From there an admin can run AI Triage: a Gemini-backed Cloud Function (admin-only) assesses whether the item is fixable, rates severity, guesses the likely area of the codebase, lays out a short plan, and produces a ready-to-paste prompt for an AI coding agent (e.g. Claude Code). The result is cached on the feedback record and can be re-run. Export still produces a CSV with one column per feature.',
         solution:
-          'Every piece of feedback is collected, searchable, and exportable — turning scattered reports into an actionable, shareable record.',
+          'Every piece of feedback is collected, searchable, exportable, and — with one click — turned into an actionable plan and a prompt a developer can run immediately, shrinking the gap between a report and a fix.',
       },
     ],
   },

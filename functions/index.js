@@ -8,6 +8,7 @@ const spiiController = require("./src/spii.controller");
 const caseSyncController = require("./src/caseSync.controller");
 
 const templatesController = require("./src/templates.controller");
+const feedbackController = require("./src/feedback.controller");
 const appsScriptController = require("./src/appsScript.controller");
 const liveSessionsController = require("./src/liveSessions.controller");
 
@@ -50,6 +51,15 @@ exports.extractTemplatesFromFile = functions.runWith({
 })
     .region("asia-southeast1")
     .https.onCall(templatesController.extractTemplatesFromFile);
+
+// 3.5. AI triage of user feedback (admin-only)
+exports.analyzeFeedback = functions.runWith({
+    secrets: ["GEMINI_API_KEY"],
+    timeoutSeconds: 120,
+    memory: "512MB"
+})
+    .region("asia-southeast1")
+    .https.onCall(feedbackController.analyzeFeedback);
 
 // 4.55. Template live sessions: auto-close sessions left open (browser closed / asleep)
 exports.closeStaleLiveSessions = functions.region("asia-southeast1")
