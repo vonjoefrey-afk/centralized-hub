@@ -17,6 +17,7 @@ import { AuroraBarChart, AuroraDonutChart } from '../ui/charts';
 import {
     STATUS_OPTIONS, ORIGIN_OPTIONS, SURVEY_OPTIONS, SPII_OPTIONS, TRANSFER_OPTIONS,
     TRANSFER_VALIDATION_OPTIONS, IRT_OPTIONS_EMAIL, IRT_OPTIONS_CHAT, IRT_TYPE_OPTIONS_CHAT,
+    WORK_TYPE_OPTIONS,
 } from '../../constants/caseFields';
 
 // Compute the current date string in Manila timezone (Asia/Manila, UTC+8)
@@ -32,6 +33,7 @@ const getManilaDateString = (dateObj = new Date()) => {
 const defaultForm = {
     caseId: '',
     status: 'Assigned',
+    workType: 'New Case',
     origin: 'Chat',
     survey: 'Not applicable',
     isSpii: 'No',
@@ -69,11 +71,12 @@ const CaseTrackerTab = () => {
 
     // Inline Editing states
     const [editingCaseId, setEditingCaseId] = useState(null);
-    const [editForm, setEditForm] = useState({ 
-        status: '', 
-        survey: '', 
-        surveyStatus: '', 
-        origin: '', 
+    const [editForm, setEditForm] = useState({
+        status: '',
+        workType: '',
+        survey: '',
+        surveyStatus: '',
+        origin: '',
         isChatContinued: '',
         isSpii: 'No',
         isTransferred: 'No',
@@ -101,6 +104,7 @@ const CaseTrackerTab = () => {
     const [statusFilter, setStatusFilter] = useState('All');
     const [irtFilter, setIrtFilter] = useState('All'); // 'All', 'Breach', 'No Breach'
     const [surveyFilter, setSurveyFilter] = useState('All');
+    const [workTypeFilter, setWorkTypeFilter] = useState('All');
 
     useEffect(() => {
         localStorage.setItem('caseTracker_isCompact', JSON.stringify(isCompact));
@@ -108,8 +112,9 @@ const CaseTrackerTab = () => {
 
     const handleEditClick = (c) => {
         setEditingCaseId(c.id);
-        setEditForm({ 
-            status: c.status, 
+        setEditForm({
+            status: c.status,
+            workType: c.workType || 'New Case',
             survey: c.survey || 'Not applicable',
             surveyStatus: c.surveyStatus || 'N/A',
             origin: c.origin || 'Chat',
@@ -125,11 +130,12 @@ const CaseTrackerTab = () => {
 
     const handleCancelEdit = () => {
         setEditingCaseId(null);
-        setEditForm({ 
-            status: '', 
-            survey: '', 
-            surveyStatus: '', 
-            origin: '', 
+        setEditForm({
+            status: '',
+            workType: '',
+            survey: '',
+            surveyStatus: '',
+            origin: '',
             isChatContinued: '',
             isSpii: 'No',
             isTransferred: 'No',
@@ -222,6 +228,9 @@ const CaseTrackerTab = () => {
 
         // Survey Filter
         if (surveyFilter !== 'All' && c.survey !== surveyFilter) return false;
+
+        // Case Type (work type) Filter
+        if (workTypeFilter !== 'All' && c.workType !== workTypeFilter) return false;
 
         // Date Filter
         if (dateFilter !== 'All Time') {
@@ -449,6 +458,16 @@ const CaseTrackerTab = () => {
                                     value={form.status}
                                     options={STATUS_OPTIONS}
                                     onChange={(val) => setForm({ ...form, status: val })}
+                                />
+                            </div>
+
+                            {/* Case Type — EOD classification (New Case vs Backlog) */}
+                            <div className="relative">
+                                <PremiumSelect
+                                    label="Case Type"
+                                    value={form.workType}
+                                    options={WORK_TYPE_OPTIONS}
+                                    onChange={(val) => setForm({ ...form, workType: val })}
                                 />
                             </div>
 
@@ -711,6 +730,14 @@ const CaseTrackerTab = () => {
                             onChange={(val) => setSurveyFilter(val)}
                         />
 
+                        {/* Case Type Filter (EOD: New Case vs Backlog) */}
+                        <PremiumSelect
+                            label="Case Type"
+                            value={workTypeFilter}
+                            options={['All', ...WORK_TYPE_OPTIONS]}
+                            onChange={(val) => setWorkTypeFilter(val)}
+                        />
+
                         {dateFilter === 'Custom' && (
                             <div className="col-span-full flex items-center gap-3 animate-slide-up">
                                 <div className="flex-1">
@@ -903,6 +930,11 @@ const CaseTrackerTab = () => {
                                                 </div>
                                         </div>
 
+                                        {/* Case Type (EOD) */}
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${c.workType === 'Backlog' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' : c.workType === 'New Case' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'}`}>
+                                            {c.workType || '—'}
+                                        </span>
+
                                         <div className="flex items-center space-x-4">
                                          <div className="flex items-center space-x-3 flex-1 min-w-0">
                                             {editingCaseId === c.id ? (
@@ -914,6 +946,14 @@ const CaseTrackerTab = () => {
                                                         options={STATUS_OPTIONS}
                                                         onChange={(val) => setEditForm({ ...editForm, status: val })}
                                                         className="w-[100px]"
+                                                    />
+                                                    <PremiumSelect
+                                                        size="sm"
+                                                        value={editForm.workType}
+                                                        icon={<span className="text-[10px] font-bold opacity-70">WT:</span>}
+                                                        options={WORK_TYPE_OPTIONS}
+                                                        onChange={(val) => setEditForm({ ...editForm, workType: val })}
+                                                        className="w-[120px]"
                                                     />
                                                     <PremiumSelect
                                                         size="sm"
@@ -1193,6 +1233,16 @@ const CaseTrackerTab = () => {
                                                         />
                                                     </div>
                                                     <div className="space-y-1.5">
+                                                        <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Case Type</label>
+                                                        <PremiumSelect
+                                                            size="md"
+                                                            value={editForm.workType}
+                                                            options={WORK_TYPE_OPTIONS}
+                                                            onChange={(val) => setEditForm({ ...editForm, workType: val })}
+                                                            className="bg-white/50 dark:bg-white/[0.02]"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
                                                         <label className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Survey Vector</label>
                                                         <PremiumSelect
                                                             size="md"
@@ -1313,6 +1363,11 @@ const CaseTrackerTab = () => {
                                                             }`}></div>
                                                         <span className="text-sm font-bold text-gray-900 dark:text-white">{c.status}</span>
                                                     </div>
+                                                </div>
+
+                                                <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">
+                                                    <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Case Type</p>
+                                                    <span className={`text-sm font-bold ${c.workType === 'Backlog' ? 'text-amber-600 dark:text-amber-300' : c.workType === 'New Case' ? 'text-emerald-600 dark:text-emerald-300' : 'text-gray-400'}`}>{c.workType || '—'}</span>
                                                 </div>
 
                                                 <div className="bg-gray-50/50 dark:bg-white/5 rounded-2xl p-3 border border-gray-100/50 dark:border-white/5">

@@ -666,6 +666,7 @@ export const addTrackedCase = async (userId, caseData, teamId) => {
             teamId,
             caseId: caseData.caseId.trim(),
             status: caseData.status,
+            workType: caseData.workType || 'New Case',
             origin: caseData.origin,
             survey: caseData.survey,
             isSpii: caseData.isSpii,

@@ -82,9 +82,9 @@ export const DOCS = [
         problem:
           'Members handle many interactions a day and need a lightweight, structured log — and any case involving sensitive info has to feed the SPII workflow without extra manual steps.',
         howItWorks:
-          'Members log each case (ID, status, survey, origin, IRT, comments). If a case is flagged as containing SPII, a background Cloud Function mirrors it into "My SPII Cases" and keeps that mirror\'s status current on every later edit.',
+          'Members log each case (ID, status, Case Type, survey, origin, IRT, comments). The Case Type classifies the work as "New Case" or "Backlog" (new submissions default to New Case) so end-of-day reporting can separate fresh work from carried-over backlog; the ledger shows it and can filter by it, and older cases logged before this existed show "—". If a case is flagged as containing SPII, a background Cloud Function mirrors it into "My SPII Cases" and keeps that mirror\'s status current on every later edit.',
         solution:
-          'One quick entry doubles as both a personal activity ledger and the trigger for SPII tracking — with the sync handled server-side so a flagged case can never be left out of the SPII notification flow.',
+          'One quick entry doubles as both a personal activity ledger and the trigger for SPII tracking — now with a New Case vs Backlog split for EOD reporting — with the SPII sync handled server-side so a flagged case can never be left out of the notification flow.',
       },
       {
         id: 'spii-cases',

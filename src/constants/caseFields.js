@@ -2,6 +2,8 @@
 // the SPII Case POC management view so the two never drift apart.
 
 export const STATUS_OPTIONS = ['Assigned', 'SO', 'Closed', 'WOCR', 'WOCRE', 'IPGS', 'IPTP', 'IPGO', 'IPGE', 'IPCR'];
+// Case classification for EOD reporting — new work vs. carried-over backlog.
+export const WORK_TYPE_OPTIONS = ['New Case', 'Backlog'];
 export const ORIGIN_OPTIONS = ['Chat', 'Email'];
 export const SURVEY_OPTIONS = ['CES', 'NCES', 'Not applicable'];
 export const SPII_OPTIONS = ['Yes', 'No'];
