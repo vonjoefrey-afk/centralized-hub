@@ -141,7 +141,9 @@ const CalculatorTab = ({ activeTab }) => {
       if (activeTab !== 'gcp-billing') return;
 
       const target = event.target;
-      if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') {
+      // Leave keys alone in form fields and on buttons/links (Enter/Space must still activate them).
+      if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' ||
+          target.isContentEditable || target.closest?.('button, a, [role="radio"], [role="button"]')) {
         return;
       }
 

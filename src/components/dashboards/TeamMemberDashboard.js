@@ -28,12 +28,11 @@ import UpdateCard from './UpdateCard';
 import CreateUpdateModal from './CreateUpdateModal';
 import TemplatesTab from './TemplatesTab';
 import FloatingPanel from '../common/FloatingPanel';
-import RunawayCalculatorTab from './RunawayCalculatorTab';
+import BmodConsultTab from './BmodConsultTab';
 import ScratchpadTab from './ScratchpadTab';
 import AppsScriptTab from './AppsScriptTab';
 import DashboardTabNav from './DashboardTabNav';
 import DashboardShell from './DashboardShell';
-import CalculatorTab from './CalculatorTab';
 import { useNotifications } from '../../hooks/useNotifications';
 import useLiveSessions from '../../hooks/useLiveSessions';
 import { endAllOpenSessions } from '../../services/liveSessions';
@@ -1395,19 +1394,13 @@ const TeamMemberDashboard = () => {
                 </div>
               )}
 
-              {/* GCP Billing Calculation Tab */}
-              {
-                activeTab === 'gcp-billing' && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <CalculatorTab activeTab={activeTab} />
-
-                    {/* Runaway Calculations Section */}
-                    <div className="relative group min-h-full">
-                      <RunawayCalculatorTab />
-                    </div>
-                  </div>
-                )
-              }
+              {/* GCP Billing Calculation (BMod consult builder) — kept mounted so a
+                  half-filled consult survives switching tabs; nothing is stored. */}
+              {features.gcpBilling && (
+                <div hidden={activeTab !== 'gcp-billing'}>
+                  <BmodConsultTab active={activeTab === 'gcp-billing'} />
+                </div>
+              )}
 
               {/* Templates — mounted unconditionally (not gated by activeTab) so an
                   open floating window survives switching to Case Tracker / Calculator.
