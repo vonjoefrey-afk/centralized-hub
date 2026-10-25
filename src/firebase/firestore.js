@@ -744,6 +744,25 @@ export const getTrackedCasesByUser = async (userId) => {
     }
 };
 
+// All SPII-flagged tracked cases, org-wide. Used by the SPII Case POC view so
+// authorized people (admin/trainer/TL/POC) can edit any SPII case, not just
+// their own. Reads are org-wide by rule; writes are gated server-side.
+export const getAllSpiiTrackedCases = async () => {
+    try {
+        const q = query(collection(db, 'tracked_cases'), where('isSpii', '==', 'Yes'));
+        const snapshot = await getDocs(q);
+        const cases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return cases.sort((a, b) => {
+            const timeA = a.createdAt?.toDate?.() || new Date(0);
+            const timeB = b.createdAt?.toDate?.() || new Date(0);
+            return timeB - timeA;
+        });
+    } catch (error) {
+        logger.error('Error fetching SPII tracked cases:', error);
+        throw error;
+    }
+};
+
 export const getAnalyticsTrackedCases = async (role, uid, teamId) => {
     try {
         let q = collection(db, 'tracked_cases');

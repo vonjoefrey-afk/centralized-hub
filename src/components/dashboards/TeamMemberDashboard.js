@@ -20,6 +20,7 @@ import FocusTimer from '../common/FocusTimer';
 import SpiiVisualDashboardTab from './SpiiVisualDashboardTab';
 import SpiiAuditLogsTab from './SpiiAuditLogsTab';
 import CaseTrackerTab from './CaseTrackerTab';
+import SpiiCaseManagementTab from './SpiiCaseManagementTab';
 import MetricAnalyticsTab from './MetricAnalyticsTab';
 import { detectSPII } from '../../utils/spiiDetector';
 import { logSpiiAudit, getSpiiDetectionSettings } from '../../firebase/firestore';
@@ -116,6 +117,9 @@ const TeamMemberDashboard = () => {
       },
       {
         id: 'spii-dashboard', label: 'SPII Analytics', visible: features.spiiCases
+      },
+      {
+        id: 'spii-cases-mgmt', label: 'SPII Case Management', visible: features.spiiCasePoc
       },
       {
         id: 'spii-audit',
@@ -952,6 +956,10 @@ const TeamMemberDashboard = () => {
 
               {activeTab === 'case-tracker' && features.caseTracker && (
                 <CaseTrackerTab />
+              )}
+
+              {activeTab === 'spii-cases-mgmt' && features.spiiCasePoc && (
+                <SpiiCaseManagementTab />
               )}
 
               {activeTab === 'metric-analytics' && features.metrics && (

@@ -169,7 +169,7 @@ export const getUserByEmail = async (email) => {
 // approved — no pending-approval step. Invites live in `provisioned_users`.
 // ---------------------------------------------------------------------------
 
-const DEFAULT_FEATURES = { updates: true, gcpBilling: true, templates: true, notes: true, metrics: true, spiiCases: false, appsScript: false };
+const DEFAULT_FEATURES = { updates: true, gcpBilling: true, templates: true, notes: true, metrics: true, spiiCases: false, spiiCasePoc: false, appsScript: false };
 
 export const createProvisionedUser = async (adminUid, { email, displayName, role, teamId = null, features } = {}) => {
   const normalized = (email || '').trim().toLowerCase();

@@ -117,6 +117,16 @@ export const DOCS = [
           'The state of SPII work is legible in seconds, making it easy to spot backlogs and confirm reviews are keeping up.',
       },
       {
+        id: 'spii-case-management',
+        name: 'SPII Case Management (POC)',
+        problem:
+          'SPII cases pile up open when their owner has left, is on leave, or is otherwise unavailable — no one else could update those cases, so they lingered in the database and kept firing chat follow-ups.',
+        howItWorks:
+          'Authorized people can edit ANY SPII case, not just their own, from a dedicated "SPII Case Management" tab: a searchable list of all SPII cases with an edit dialog carrying the full set of owner fields (status, origin, survey, IRT, transfer, comments). Moving a case to a resolved status (SO / Closed) drops it from the open list and the SPII chat follow-up. Who may do this: Admins, Trainers, and Team Leaders by role, plus any member an admin grants the per-user "SPII Case POC" feature (off by default). The power is enforced server-side — a Firestore rule lets these roles/POCs update cases flagged isSpii, while everyone else stays owner-only, and deletes remain owner-only for everyone. Every privileged edit is stamped with who made it (lastEditedBy) and logged to the activity feed.',
+        solution:
+          'Stale SPII cases can be closed and kept up to date even when the owner is gone, so the database and chat notifications reflect reality — without giving anyone the ability to delete other people\'s cases.',
+      },
+      {
         id: 'templates',
         name: 'Templates',
         problem:

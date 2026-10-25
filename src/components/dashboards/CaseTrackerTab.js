@@ -14,22 +14,10 @@ import { endSessionForCase } from '../../services/liveSessions';
 import clsx from 'clsx';
 import { AuroraBarChart, AuroraDonutChart } from '../ui/charts';
 
-const STATUS_OPTIONS = ['Assigned', 'SO', 'Closed', 'WOCR', 'WOCRE', 'IPGS', 'IPTP', 'IPGO', 'IPGE', 'IPCR'];
-const ORIGIN_OPTIONS = ['Chat', 'Email'];
-const SURVEY_OPTIONS = ['CES', 'NCES', 'Not applicable'];
-const SPII_OPTIONS = ['Yes', 'No'];
-const TRANSFER_OPTIONS = ['Yes', 'No'];
-const TRANSFER_VALIDATION_OPTIONS = ['Maps', 'A&S', 'Tech'];
-const IRT_OPTIONS_EMAIL = [
-    'Close to Resolution SLA upon Case assignment',
-    'CT Transfer'
-];
-const IRT_OPTIONS_CHAT = [
-    'Past 2 mins upon chat assignment',
-    'Close to Resolution SLA upon Case assignment',
-    'CT Transfer'
-];
-const IRT_TYPE_OPTIONS_CHAT = ['Original Owner', 'Seamless Recontact'];
+import {
+    STATUS_OPTIONS, ORIGIN_OPTIONS, SURVEY_OPTIONS, SPII_OPTIONS, TRANSFER_OPTIONS,
+    TRANSFER_VALIDATION_OPTIONS, IRT_OPTIONS_EMAIL, IRT_OPTIONS_CHAT, IRT_TYPE_OPTIONS_CHAT,
+} from '../../constants/caseFields';
 
 // Compute the current date string in Manila timezone (Asia/Manila, UTC+8)
 const getManilaDateString = (dateObj = new Date()) => {

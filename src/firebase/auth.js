@@ -220,6 +220,7 @@ export const signUp = async (email, password, displayName, role = USER_ROLES.TEA
         notes: true,
         metrics: true,
         spiiCases: false,
+        spiiCasePoc: false,
         spiiAudit: true
       }
     };
@@ -728,7 +729,7 @@ export const signInWithGoogle = async () => {
             manuallyAdded: true,
             ssoMigrated: true,
             features: prov.features || {
-              updates: true, gcpBilling: true, templates: true, notes: true, metrics: true, spiiCases: false, appsScript: false,
+              updates: true, gcpBilling: true, templates: true, notes: true, metrics: true, spiiCases: false, spiiCasePoc: false, appsScript: false,
             },
           };
           await setDoc(doc(db, 'users', user.uid), provisionedData);
@@ -846,6 +847,7 @@ export const signInWithGoogle = async () => {
               notes: true,
               metrics: true,
               spiiCases: false,
+              spiiCasePoc: false,
               appsScript: false
             }
           };

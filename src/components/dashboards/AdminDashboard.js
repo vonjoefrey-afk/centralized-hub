@@ -18,6 +18,7 @@ import { UserGroupIcon, ShieldCheckIcon, UsersIcon, UserIcon, BriefcaseIcon, Che
 import AcknowledgmentModal from '../AcknowledgmentModal';
 import UpdateCard from './UpdateCard';
 import SpiiAuditLogsTab from './SpiiAuditLogsTab';
+import SpiiCaseManagementTab from './SpiiCaseManagementTab';
 import FeedbackTab from './FeedbackTab';
 import UtilizationMonitorTab from './UtilizationMonitorTab';
 import DashboardShell from './DashboardShell';
@@ -111,6 +112,7 @@ const AdminDashboard = () => {
     { id: 'metric-analytics',  label: 'Metric Analytics' },
     { id: 'caseTracker',       label: 'Case Tracker' },
     { id: 'spiiCases',         label: 'SPII Cases & Analytics' },
+    { id: 'spiiCasePoc',       label: 'SPII Case POC (edit any SPII case)' },
     { id: 'spiiAudit',         label: 'SPII Audit Logs' },
     { id: 'appsScript',        label: 'Apps Script Integration' },
   ];
@@ -124,6 +126,7 @@ const AdminDashboard = () => {
     'metric-analytics': true,
     caseTracker: true,
     spiiCases: false,
+    spiiCasePoc: false, // Off by default — admin grants per user to make them a POC
     spiiAudit: true, // Default enabled for admins to see initially
     appsScript: false, // Off by default — admin enables per user
   };
@@ -662,6 +665,7 @@ const AdminDashboard = () => {
     { id: 'users', label: 'User Management', group: 'People' },
     { id: 'pending', label: 'Pending Approvals', group: 'People', badge: pendingTeamLeaders.length > 0 ? pendingTeamLeaders.length : null },
     { id: 'spii-analytics', label: 'SPII Analytics', group: 'SPII & Compliance' },
+    { id: 'spii-cases-mgmt', label: 'SPII Case Management', group: 'SPII & Compliance' },
     { id: 'spii-audit', label: 'SPII Audit Logs', group: 'SPII & Compliance' },
     { id: 'utilization', label: 'App Utilization', group: 'Insights' },
     { id: 'metric-analytics', label: 'Metric Analytics', group: 'Insights' },
@@ -1347,6 +1351,10 @@ const AdminDashboard = () => {
 
         {activeTab === 'spii-audit' && (
           <SpiiAuditLogsTab currentUser={user} />
+        )}
+
+        {activeTab === 'spii-cases-mgmt' && (
+          <SpiiCaseManagementTab />
         )}
 
         {activeTab === 'metric-analytics' && (

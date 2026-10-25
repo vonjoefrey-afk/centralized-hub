@@ -44,11 +44,25 @@ service cloud.firestore {
 
     // Helper function to check if user has SPII cases feature
     function hasSpiiCasesFeature() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['features']) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['features']) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.keys().hasAll(['spiiCases']) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.spiiCases == true;
+    }
+
+    // SPII Case POC: may edit ANY SPII case, not just their own (granted per-user).
+    function hasSpiiCasePoc() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.keys().hasAll(['features']) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.keys().hasAll(['spiiCasePoc']) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.features.spiiCasePoc == true;
+    }
+
+    // May a privileged user edit SPII cases they don't own? (admin/trainer/TL or POC)
+    function canManageSpiiCases() {
+      return isAdmin() || isTrainer() || isTeamLeader() || hasSpiiCasePoc();
     }
 
     // Helper function to check if user has SPII Audit feature
@@ -315,10 +329,17 @@ service cloud.firestore {
 
     match /tracked_cases/{caseId} {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      // INTENTIONAL: reads are org-wide. Case analytics are shown across roles
-      // by product decision; only the owner may update/delete their own cases.
+      // INTENTIONAL: reads are org-wide. Case analytics are shown across roles.
       allow read, list: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Owners may update their own cases. Additionally, admins/trainers/TLs and
+      // per-user SPII Case POCs may update ANY case flagged as SPII (isSpii == 'Yes')
+      // — e.g. to close a stale case whose owner is unavailable. Non-SPII cases of
+      // other users stay owner-only. Deletes remain owner-only for everyone.
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.isSpii == 'Yes' && canManageSpiiCases())
+      );
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
     match /password_resets/{resetId} {

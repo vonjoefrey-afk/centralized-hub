@@ -16,6 +16,7 @@ import DashboardShell from './DashboardShell';
 import ChangePasswordModal from '../ChangePasswordModal';
 import SpiiVisualDashboardTab from './SpiiVisualDashboardTab';
 import CaseTrackerTab from './CaseTrackerTab';
+import SpiiCaseManagementTab from './SpiiCaseManagementTab';
 import { Button, Card, Badge, Modal, Skeleton, CardSkeleton, EmptyState, Alert, Input, DateTimePicker, PremiumSelect } from '../ui';
 import TLTeamMembersTab from './TLDashboard/TLTeamMembersTab';
 import TLUpdatesTab from './TLDashboard/TLUpdatesTab';
@@ -1084,6 +1085,7 @@ const TeamLeaderDashboard = () => {
     ...(features.notes ? [{ id: 'notes', label: 'Notes' }] : []),
     ...(features.spiiCases ? [{ id: 'spii-dashboard', label: 'SPII Analytics' }] : []),
     ...(features.caseTracker ? [{ id: 'case-tracker', label: 'Case Tracker' }] : []),
+    { id: 'spii-cases-mgmt', label: 'SPII Case Management' },
     ...(features.metrics ? [{ id: 'metric-analytics', label: 'Metric Analytics' }] : []),
   ];
 
@@ -1267,6 +1269,15 @@ const TeamLeaderDashboard = () => {
                     Case Tracker
                   </button>
                 )}
+                <button
+                  onClick={() => setActiveTab('spii-cases-mgmt')}
+                  className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'spii-cases-mgmt'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  SPII Case Management
+                </button>
                 {features.metrics && (
                   <button
                     onClick={() => setActiveTab('metric-analytics')}
@@ -1331,6 +1342,10 @@ const TeamLeaderDashboard = () => {
 
             {activeTab === 'case-tracker' && features.caseTracker && (
               <CaseTrackerTab />
+            )}
+
+            {activeTab === 'spii-cases-mgmt' && (
+              <SpiiCaseManagementTab />
             )}
 
             {activeTab === 'metric-analytics' && features.metrics && (
