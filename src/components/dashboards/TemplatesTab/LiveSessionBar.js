@@ -73,14 +73,14 @@ export const StartSessionForm = ({
         <input
           ref={inputRef}
           type="text"
-          inputMode="text"
+          inputMode="numeric"
           autoComplete="off"
           value={caseId}
-          onChange={(e) => setCaseId(e.target.value)}
+          onChange={(e) => setCaseId(e.target.value.replace(/\D/g, '').slice(0, 8))}
           onKeyDown={(e) => { if (e.key === 'Escape') onCancel?.(); }}
-          placeholder="Paste case ID"
+          placeholder="8-digit case ID"
           aria-label="Case ID"
-          maxLength={80}
+          maxLength={8}
           className="flex-1 min-w-[140px] px-3 py-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-sm font-mono text-gray-900 dark:text-white placeholder-gray-400/70 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50"
         />
         <ChannelToggle value={channel} onChange={setChannel} />
@@ -94,7 +94,7 @@ export const StartSessionForm = ({
         </button>
       </div>
       {caseId && !valid && (
-        <p className="text-[11px] text-rose-500">Use 1–64 letters, numbers or - _ # . / :</p>
+        <p className="text-[11px] text-rose-500">Case ID must be exactly 8 digits.</p>
       )}
       {blocked && (
         <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">

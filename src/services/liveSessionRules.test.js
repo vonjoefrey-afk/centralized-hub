@@ -10,11 +10,18 @@ describe('case IDs', () => {
   it('normalizes whitespace', () => {
     expect(normalizeCaseId('  12 345 ')).toBe('12345');
   });
-  it('validates', () => {
-    expect(isValidCaseId('8-1234567890')).toBe(true);
+  it('accepts exactly 8 digits', () => {
+    expect(isValidCaseId('76840934')).toBe(true);
+    expect(isValidCaseId('  7684 0934 ')).toBe(true); // whitespace is normalized away
+    expect(isValidCaseId('00000000')).toBe(true);     // leading zeros are fine
+  });
+  it('rejects wrong length or non-digits', () => {
+    expect(isValidCaseId('1234567')).toBe(false);   // 7 digits
+    expect(isValidCaseId('123456789')).toBe(false); // 9 digits
+    expect(isValidCaseId('7684093a')).toBe(false);  // contains a letter
+    expect(isValidCaseId('8-123456')).toBe(false);  // contains a symbol
     expect(isValidCaseId('')).toBe(false);
     expect(isValidCaseId('   ')).toBe(false);
-    expect(isValidCaseId('a'.repeat(65))).toBe(false);
     expect(isValidCaseId('<script>')).toBe(false);
   });
 });

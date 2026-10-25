@@ -40,8 +40,8 @@ export const limitsFor = (channel) => SESSION_LIMITS[channel] || SESSION_LIMITS.
 /** Trim and drop inner whitespace so "  12 345 " and "12345" are the same case. */
 export const normalizeCaseId = (raw) => String(raw ?? '').replace(/\s+/g, '').trim();
 
-/** Case IDs: 1–64 chars of letters, digits and - _ # . / : */
-export const isValidCaseId = (raw) => /^[A-Za-z0-9\-_#./:]{1,64}$/.test(normalizeCaseId(raw));
+/** Case IDs: exactly 8 digits (e.g. 76840934). */
+export const isValidCaseId = (raw) => /^\d{8}$/.test(normalizeCaseId(raw));
 
 /** Accepts Firestore Timestamp, Date, millis, or null (pending server write => now). */
 export const toMillis = (value, fallback = Date.now()) => {
