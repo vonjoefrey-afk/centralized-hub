@@ -19,8 +19,22 @@ export const FEATURE_FLOWS = {
   E --> F["Render allowed tabs only"]
   F --> G(["Scoped workspace shown"])`,
 
+  'overview:navigation-sidebar': `flowchart TD
+  A(["Open a dashboard"]) --> B{"Screen 1024px or wider?"}
+  B -->|Yes| C["Restore saved sidebar state"]
+  C --> D{"Collapsed?"}
+  D -->|No| E["Labelled sidebar, content beside it"]
+  D -->|Yes| F["Icon rail with tooltips, content widens"]
+  E --> G[/"Click ☰ or chevron"/]
+  F --> G
+  G --> H[("Save state in browser")]
+  H --> D
+  B -->|No| I[/"Tap ☰"/]
+  I --> J["Drawer opens, focus moves in"]
+  J --> K(["Pick a tab or press Escape"])`,
+
   'overview:quick-access': `flowchart TD
-  A(["Open nav drawer"]) --> B[/"Tap the star on a tab"/]
+  A(["Open nav menu"]) --> B[/"Tap the star on a tab"/]
   B --> C["Tab pinned, saved per user"]
   C --> D["Shows in Quick Access bar"]
   D --> E[/"Click pill"/]
