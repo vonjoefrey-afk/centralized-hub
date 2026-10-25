@@ -82,9 +82,9 @@ export const DOCS = [
         problem:
           'Members handle many interactions a day and need a lightweight, structured log — and any case involving sensitive info has to feed the SPII workflow without extra manual steps.',
         howItWorks:
-          'Members log each case (ID, status, survey, origin, IRT, comments). If a case is flagged as containing SPII, a background Cloud Function mirrors it into "My SPII Cases" and keeps that mirror\'s status current on every later edit.',
+          'Members log each case (ID, status, Case Type, survey, origin, IRT, comments). The Case Type classifies the work as "New Case" or "Backlog" (new submissions default to New Case) so end-of-day reporting can separate fresh work from carried-over backlog. The ledger shows it on every case, can filter by it, and summarizes the New Case / Backlog counts for the current view. Older cases logged before this existed have no Case Type and show as "Unclassified" (with their own filter option); editing one keeps it Unclassified unless the owner picks a type. "Export CSV" downloads exactly what the ledger currently shows (all filters applied) with a Case Type column, for EOD submission. If a case is flagged as containing SPII, a background Cloud Function mirrors it into "My SPII Cases" and keeps that mirror\'s status current on every later edit.',
         solution:
-          'One quick entry doubles as both a personal activity ledger and the trigger for SPII tracking — with the sync handled server-side so a flagged case can never be left out of the SPII notification flow.',
+          'One quick entry doubles as both a personal activity ledger and the trigger for SPII tracking — now with a New Case vs Backlog split and a one-click CSV for EOD reporting — with the SPII sync handled server-side so a flagged case can never be left out of the notification flow.',
       },
       {
         id: 'spii-cases',
@@ -162,7 +162,7 @@ export const DOCS = [
         problem:
           'Teams need a consolidated, trustworthy view of operational performance; the survey (CES/NCES) metric was deprecated because it was prone to manipulation.',
         howItWorks:
-          'The tab focuses on two reliable metrics — IRT (initial-response-time breaches) and Backlogs (open cases) — with team/agent/date filters and CSV export. IRT shows breach reasons and breaches-by-origin as premium donut charts; Backlogs shows open cases by team and top agents as bar charts, plus detailed team/agent breakdowns. All charts are the theme-aware Aurora chart set.',
+          'The tab focuses on two reliable metrics — IRT (initial-response-time breaches) and Backlogs (open cases) — with team/agent/date filters, a Case Type filter (New Case / Backlog / Unclassified — the EOD classification members set in Case Tracker, distinct from the Backlogs metric, which counts open statuses), and CSV export that includes a Case Type column. IRT shows breach reasons and breaches-by-origin as premium donut charts; Backlogs shows open cases by team and top agents as bar charts, plus detailed team/agent breakdowns. All charts are the theme-aware Aurora chart set.',
         solution:
           'Performance is self-serviceable and resistant to gaming — leaders and members track IRT and backlog health at a glance without waiting for a report.',
       },

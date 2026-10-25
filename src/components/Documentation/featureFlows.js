@@ -59,7 +59,7 @@ export const FEATURE_FLOWS = {
   G --> B`,
 
   'team-member:case-tracker': `flowchart TD
-  A(["Open Case Tracker"]) --> B[/"Enter case details"/]
+  A(["Open Case Tracker"]) --> B[/"Enter case details + Case Type (New Case / Backlog)"/]
   B --> C["Save tracked case"]
   C --> D{"Contains SPII?"}
   D -->|No| E["Logged as normal case"]
@@ -68,7 +68,9 @@ export const FEATURE_FLOWS = {
   E --> H{"Log another case?"}
   G --> H
   H -->|Yes| B
-  H -->|No| I(["Done"])`,
+  H -->|No| J["Filter ledger by date and Case Type"]
+  J --> K[("Export CSV for EOD")]
+  K --> I(["Done"])`,
 
   'team-member:spii-cases': `flowchart TD
   A(["Open My SPII Cases"]) --> B["Update case status"]
@@ -169,10 +171,14 @@ export const FEATURE_FLOWS = {
 
   'team-member:metric-analytics': `flowchart TD
   A(["Open Metric Analytics"]) --> B[/"Load performance data"/]
-  B --> C["Visualize metrics"]
-  C --> D{"Change range?"}
-  D -->|Yes| B
-  D -->|No| E(["Self-service view"])`,
+  B --> C["Filter by team, agent, date, Case Type"]
+  C --> F["Visualize metrics"]
+  F --> D{"Change filters?"}
+  D -->|Yes| C
+  D -->|No| G{"Export?"}
+  G -->|Yes| H[("CSV with Case Type column")]
+  G -->|No| E(["Self-service view"])
+  H --> E`,
 
   'team-member:feedback': `flowchart TD
   A(["Click feedback button"]) --> B{"Bug or UAT?"}
