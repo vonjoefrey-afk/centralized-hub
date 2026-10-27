@@ -1252,6 +1252,28 @@ const TeamMemberDashboard = () => {
                       </div>
 
                       <div className="overflow-hidden rounded-[2rem] border border-gray-200/50 dark:border-white/10 bg-white/90 dark:bg-[#18181b]/80 backdrop-blur-sm shadow-inner">
+                        {/* Loading / empty states sit outside the wide table so they stay on-screen on phones */}
+                        {spiiLoading || filteredSpiiCases.length === 0 ? (
+                          <div className="px-6 py-20 text-center">
+                            {spiiLoading ? (
+                              <div className="flex flex-col items-center justify-center gap-4">
+                                <div className="relative">
+                                  <div className="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                                  </div>
+                                </div>
+                                <span className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-500/60 animate-pulse">Synchronizing Intelligence Ledger</span>
+                              </div>
+                            ) : (
+                              <EmptyState
+                                icon={<ClipboardDocumentIcon className="h-12 w-12 text-gray-200 dark:text-gray-800" />}
+                                title={spiiSearchTerm ? "No identity matches" : "Ledger is empty"}
+                                description={spiiSearchTerm ? `No log entries for "${spiiSearchTerm}" found.` : "Initiate a governance log to build your history."}
+                              />
+                            )}
+                          </div>
+                        ) : (
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y divide-gray-200/50 dark:divide-white/5">
                             <thead className="bg-gray-50/95 dark:bg-white/10 uppercase">
@@ -1264,31 +1286,7 @@ const TeamMemberDashboard = () => {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100/50 dark:divide-white/5">
-                              {spiiLoading ? (
-                                <tr>
-                                  <td colSpan="5" className="px-6 py-24 text-center">
-                                    <div className="flex flex-col items-center justify-center gap-4">
-                                      <div className="relative">
-                                        <div className="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                          <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
-                                        </div>
-                                      </div>
-                                      <span className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-500/60 animate-pulse">Synchronizing Intelligence Ledger</span>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ) : filteredSpiiCases.length === 0 ? (
-                                <tr>
-                                  <td colSpan="5" className="px-6 py-20 text-center">
-                                    <EmptyState
-                                      icon={<ClipboardDocumentIcon className="h-12 w-12 text-gray-200 dark:text-gray-800" />}
-                                      title={spiiSearchTerm ? "No identity matches" : "Ledger is empty"}
-                                      description={spiiSearchTerm ? `No log entries for "${spiiSearchTerm}" found.` : "Initiate a governance log to build your history."}
-                                    />
-                                  </td>
-                                </tr>
-                              ) : (
+                              {(
                                 filteredSpiiCases.map((c) => (
                                   <tr key={c.id} className="group hover:bg-white/60 dark:hover:bg-white/[0.02] transition-all duration-500">
                                     <td className="px-8 py-6 whitespace-nowrap">
@@ -1390,6 +1388,7 @@ const TeamMemberDashboard = () => {
                             </tbody>
                           </table>
                         </div>
+                        )}
                       </div>
                     </div>
                   </div>
