@@ -93,6 +93,43 @@ describe('Runaway eligibility matrix', () => {
   });
 });
 
+describe('USD-based limits for non-USD currencies', () => {
+  it('does not cap ¥2,000,000 (≈ $13,333) — the $1M cap is checked in USD', () => {
+    const r = computeAdjustment(sample({ currency: 'JPY', usdRate: '150', impactedAmount: '2000000' }));
+    expect(r).toMatchObject({ total: 2000000, capped: false });
+    expect(r.totalUsd).toBeCloseTo(13333.33, 2);
+  });
+  it('caps €1,500,000 only when its USD value exceeds $1M', () => {
+    // 1 USD = 1.6 EUR → €1.5M ≈ $937,500: under the cap
+    expect(computeAdjustment(sample({ currency: 'EUR', usdRate: '1.6', impactedAmount: '1500000' }))).toMatchObject({ total: 1500000, capped: false });
+    // 1 USD = 0.92 EUR → €1.5M ≈ $1.63M: capped at $1M = €920,000
+    expect(computeAdjustment(sample({ currency: 'EUR', usdRate: '0.92', impactedAmount: '1500000' }))).toMatchObject({ total: 920000, capped: true });
+  });
+  it('caps ¥200,000,000 (≈ $1.33M) at the yen equivalent of $1M', () => {
+    expect(computeAdjustment(sample({ currency: 'JPY', usdRate: '150', impactedAmount: '200000000' }))).toMatchObject({ total: 150000000, capped: true });
+  });
+  it('without an exchange rate, does not cap and asks for the rate', () => {
+    const form = sample({ currency: 'JPY', usdRate: '', impactedAmount: '200000000' });
+    expect(computeAdjustment(form)).toMatchObject({ total: 200000000, capped: false, totalUsd: null });
+    const { missing, warnings } = buildConsult(form);
+    expect(missing).toContain('Exchange rate (1 USD = ? JPY)');
+    expect(warnings.some((w) => w.text.includes('Enter the exchange rate'))).toBe(true);
+  });
+  it('applies the $5k #RCAdj limit in USD', () => {
+    // ¥600,000 at 150 = $4,000 → tag stays
+    expect(buildConsult(sample({ restrictedCountry: 'Y', currency: 'JPY', usdRate: '150', impactedAmount: '600000' })).subject).toBe(`${SUBJECT_BASE} #RCAdj`);
+    // ¥900,000 at 150 = $6,000 → no tag
+    expect(buildConsult(sample({ restrictedCountry: 'Y', currency: 'JPY', usdRate: '150', impactedAmount: '900000' })).subject).toBe(SUBJECT_BASE);
+  });
+  it('shows the USD equivalent in the consult for non-USD totals', () => {
+    const { text } = buildConsult(sample({ currency: 'JPY', usdRate: '150', impactedAmount: '2000000' }));
+    expect(text).toContain('Total Adjustment Amount: 2,000,000.00 JPY (≈ $13,333.33 USD at 1 USD = 150 JPY)');
+  });
+  it('USD needs no rate', () => {
+    expect(buildConsult(sample()).missing).toEqual([]);
+  });
+});
+
 describe('TPA / Other', () => {
   it('uses the chosen eligibility × impacted amount, uncapped', () => {
     const form = sample({ policy: 'TPA', eligibility: '90', impactedAmount: '2000000' });

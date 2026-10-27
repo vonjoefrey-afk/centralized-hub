@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import {
   ClipboardDocumentIcon, ClipboardDocumentCheckIcon, PlusIcon, XMarkIcon, ExclamationTriangleIcon,
@@ -15,6 +15,7 @@ import {
   PRODUCT_CODE_DEFAULT, emptyForm, buildConsult, budgetAlertStatus, anomalyStatus, formatMoney,
   isDriveLink, segmentFor,
 } from '../../utils/bmodConsult';
+import { fetchUsdRate, FX_ATTRIBUTION_URL } from '../../services/fxRates';
 
 
 const inputCls = 'w-full px-4 py-2.5 bg-gray-50/50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm font-semibold text-gray-900 dark:text-white placeholder-gray-400/70 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all';
@@ -169,6 +170,31 @@ const BmodConsultTab = ({ active = true }) => {
   const set = (field) => (value) => setForm((f) => ({ ...f, [field]: value }));
   const setInput = (field) => (e) => set(field)(e.target.value);
 
+  // Live exchange rate: on each currency change, clear the old rate and fill
+  // today's rate unless the agent has typed one meanwhile. Always editable.
+  const [rateInfo, setRateInfo] = useState({ status: 'idle' }); // idle | loading | auto | manual | error
+  const rateTypedRef = useRef(false);
+  useEffect(() => {
+    const currency = form.currency;
+    rateTypedRef.current = false;
+    if (!currency || currency === 'USD') { setRateInfo({ status: 'idle' }); return undefined; }
+    let cancelled = false;
+    setForm((f) => ({ ...f, usdRate: '' }));
+    setRateInfo({ status: 'loading' });
+    fetchUsdRate(currency)
+      .then(({ rate, updatedAt }) => {
+        if (cancelled || rateTypedRef.current) return; // agent typed first — keep theirs
+        setForm((f) => (f.currency === currency ? { ...f, usdRate: String(rate) } : f));
+        setRateInfo({ status: 'auto', updatedAt });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        logger.error('Live exchange rate lookup failed:', err);
+        setRateInfo({ status: 'error' });
+      });
+    return () => { cancelled = true; };
+  }, [form.currency]);
+
   const isRunaway = form.policy === 'Runaway';
   const consult = useMemo(() => buildConsult(form), [form]);
   const budget = budgetAlertStatus(form);
@@ -226,6 +252,36 @@ const BmodConsultTab = ({ active = true }) => {
                 <Field label="Currency">
                   <PremiumSelect value={form.currency} onChange={set('currency')} options={CURRENCY_OPTIONS} size="md" />
                 </Field>
+                {form.currency !== 'USD' && (
+                  <Field label={`Exchange rate (1 USD = ? ${form.currency})`} required hint="limits are checked in USD">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.usdRate}
+                      onChange={(e) => { rateTypedRef.current = true; set('usdRate')(e.target.value); setRateInfo({ status: 'manual' }); }}
+                      placeholder="e.g. 150.25"
+                      aria-label={`Exchange rate, ${form.currency} per 1 USD`}
+                      className={clsx(inputCls, 'font-mono')}
+                    />
+                    <p className="mt-1.5 ml-1 text-[11px] text-gray-500 dark:text-gray-400" aria-live="polite">
+                      {rateInfo.status === 'loading' && 'Fetching today\'s rate…'}
+                      {rateInfo.status === 'auto' && (
+                        <>
+                          Live rate, as of {rateInfo.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ·{' '}
+                          <a href={FX_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer" className="underline hover:text-indigo-500">Rates by Exchange Rate API</a>
+                          {' '}· edit to use an official rate
+                        </>
+                      )}
+                      {rateInfo.status === 'manual' && 'Rate entered manually.'}
+                      {rateInfo.status === 'error' && <span className="text-amber-600 dark:text-amber-400 font-bold">Couldn't fetch a live rate — enter it manually.</span>}
+                    </p>
+                    {consult.totalUsd !== null && consult.total !== null && (
+                      <p className="mt-1.5 ml-1 text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                        Total ≈ {formatMoney(Math.round(consult.totalUsd * 100) / 100, 'USD')}
+                      </p>
+                    )}
+                  </Field>
+                )}
                 <Field label="Impacted amount" required>
                   <MoneyInput value={form.impactedAmount} onChange={set('impactedAmount')} label="Impacted amount" currency={form.currency} />
                 </Field>
