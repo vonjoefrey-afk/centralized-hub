@@ -44,6 +44,7 @@ export const emptyForm = () => ({
   affectedFrom: '',
   affectedTo: '',
   currency: 'USD',
+  usdRate: '',               // non-USD only: units of `currency` per 1 USD (agent-entered)
   impactedAmount: '',
   usage90Days: '',           // Runaway only
   eligibility: '',           // TPA/Other (and Runaway when segment is OTHER): '10' | … | 'custom'
@@ -166,7 +167,24 @@ export const runawayEligibility = (form) => {
   return { percent: safeguard ? 75 : 50, reason: `1st incident, SMB / Scaled / unowned Startup, ${safeguardText}.` };
 };
 
-/** Suggested %, total and cap for the current form. */
+/**
+ * Units of the form's currency per 1 USD: 1 for USD, the agent-entered rate
+ * otherwise, or null when it's missing/invalid. The project has no FX source,
+ * so the rate comes from the agent rather than a hardcoded (stale) table.
+ */
+export const usdRateFor = (form) => {
+  if (!form.currency || form.currency === 'USD') return 1;
+  const rate = parseAmount(form.usdRate);
+  return rate !== null && rate > 0 ? rate : null;
+};
+
+/** Amount in the form's currency → USD, or null when the rate is unknown. */
+export const toUsd = (amount, form) => {
+  const rate = usdRateFor(form);
+  return amount === null || amount === undefined || rate === null ? null : amount / rate;
+};
+
+/** Suggested %, total and cap for the current form. The $1M cap is applied in USD. */
 export const computeAdjustment = (form) => {
   const impacted = parseAmount(form.impactedAmount);
   const eligibility = form.policy === 'Runaway'
@@ -177,17 +195,19 @@ export const computeAdjustment = (form) => {
   let capped = false;
   if (impacted !== null && percent !== null && percent !== undefined) {
     total = round2((impacted * percent) / 100);
-    if (form.policy === 'Runaway' && total > RUNAWAY_CAP) {
-      total = RUNAWAY_CAP;
+    // Compare in USD; without a rate the cap can't be judged, so it isn't applied.
+    const totalUsd = toUsd(total, form);
+    if (form.policy === 'Runaway' && totalUsd !== null && totalUsd > RUNAWAY_CAP) {
+      total = round2(RUNAWAY_CAP * usdRateFor(form));
       capped = true;
     }
   }
-  return { impacted, percent, total, capped, eligibility };
+  return { impacted, percent, total, totalUsd: toUsd(total, form), capped, eligibility };
 };
 
-/** Subject line; #RCAdj only for restricted-country customers with an adjustment ≤ 5k. */
-export const buildSubject = (restrictedCountry, total) => {
-  const tag = restrictedCountry === 'Y' && !(total !== null && total > RESTRICTED_COUNTRY_MAX);
+/** Subject line; #RCAdj only for restricted-country customers with an adjustment ≤ $5k (pass the USD total). */
+export const buildSubject = (restrictedCountry, totalUsd) => {
+  const tag = restrictedCountry === 'Y' && !(totalUsd !== null && totalUsd > RESTRICTED_COUNTRY_MAX);
   return tag ? `${SUBJECT_BASE} ${RESTRICTED_COUNTRY_TAG}` : SUBJECT_BASE;
 };
 
@@ -209,7 +229,7 @@ const segmentText = (form) => {
  */
 export const buildConsult = (form) => {
   const isRunaway = form.policy === 'Runaway';
-  const { impacted, percent, total, capped, eligibility } = computeAdjustment(form);
+  const { impacted, percent, total, totalUsd, capped, eligibility } = computeAdjustment(form);
   const budget = budgetAlertStatus(form);
   const anomaly = anomalyStatus(form);
   const cur = form.currency || 'USD';
@@ -225,6 +245,7 @@ export const buildConsult = (form) => {
   need(form.affectedFrom && form.affectedTo, 'Affected dates');
   need(impacted !== null, 'Impacted amount');
   if (isRunaway) need(parseAmount(form.usage90Days) !== null, 'Last 90 days usage amount');
+  need(usdRateFor(form) !== null, `Exchange rate (1 USD = ? ${form.currency})`);
   need(percent !== null && percent !== undefined, 'Suggested adjustment');
   need(form.segment, 'Customer segment');
   if (isRunaway) need(form.budgetAlert, 'Budget alerts');
@@ -246,14 +267,14 @@ export const buildConsult = (form) => {
   if (isRunaway && percent === 0) warnings.push({ level: 'error', text: eligibility.reason });
   if (isRunaway && budget.label === 'Y-invalid') warnings.push({ level: 'warn', text: `Budget alert is invalid: budget exceeds 25% of last 90 days usage (limit ${formatMoney(budget.limit, cur)}).` });
   if (isRunaway && anomaly.label === 'Y-invalid') warnings.push({ level: 'warn', text: `Anomaly detection is invalid: threshold exceeds 100% of last 90 days usage (limit ${formatMoney(anomaly.limit, cur)}).` });
-  if (capped) warnings.push({ level: 'warn', text: `Total capped at ${formatMoney(RUNAWAY_CAP, cur)} (Runaway Spend maximum).` });
+  if (capped) warnings.push({ level: 'warn', text: `Total capped at ${formatMoney(RUNAWAY_CAP, 'USD')}${cur !== 'USD' ? ` (= ${formatMoney(total, cur)})` : ''} (Runaway Spend maximum).` });
   if (!isRunaway && form.reseller === 'Y') warnings.push({ level: 'warn', text: 'Customer is a reseller — confirm the partner should not handle this adjustment.' });
   const badLinks = filled(form.screenshotLinks).filter((l) => !isDriveLink(l));
   if (badLinks.length) warnings.push({ level: 'warn', text: `Screenshot links must be Google Drive links: ${badLinks.join(', ')}` });
   if (form.relatedBug.trim() && !isBugRef(form.relatedBug)) warnings.push({ level: 'warn', text: 'Related bug should look like b/123456789.' });
   if (form.billingAccountId.trim() && !isBillingAccountId(form.billingAccountId)) warnings.push({ level: 'warn', text: 'Cloud Billing Account ID should look like XXXXXX-XXXXXX-XXXXXX.' });
   if (form.requesterEmail.trim() && !isEmail(form.requesterEmail)) warnings.push({ level: 'warn', text: 'Requester email does not look valid.' });
-  if (cur !== 'USD' && (form.restrictedCountry === 'Y' || isRunaway)) warnings.push({ level: 'info', text: 'The $5k #RCAdj limit and the $1M Runaway cap are USD amounts — check the converted value.' });
+  if (usdRateFor(form) === null && (form.restrictedCountry === 'Y' || isRunaway)) warnings.push({ level: 'warn', text: `Enter the exchange rate (1 USD = ? ${cur}): the $5k #RCAdj limit and the $1M Runaway cap are checked in USD.` });
 
   const dates = form.affectedFrom && form.affectedTo ? `${form.affectedFrom} to ${form.affectedTo}` : '';
   const pct = percent !== null && percent !== undefined ? `${percent}%` : '';
@@ -296,7 +317,7 @@ export const buildConsult = (form) => {
     `Impacted Amount: ${formatMoney(impacted, cur)}`,
     ...(isRunaway ? [`Last 90 days usage amount: ${formatMoney(parseAmount(form.usage90Days), cur)}`] : []),
     `Suggested Adjustment: ${pct}`,
-    `Total Adjustment Amount: ${formatMoney(total, cur)}${capped ? ' (capped at Runaway Spend maximum)' : ''}`,
+    `Total Adjustment Amount: ${formatMoney(total, cur)}${cur !== 'USD' && totalUsd !== null ? ` (≈ ${formatMoney(round2(totalUsd), 'USD')} at 1 USD = ${usdRateFor(form)} ${cur})` : ''}${capped ? ' (capped at Runaway Spend maximum)' : ''}`,
     `Customer Segment: ${segmentText(form)}`,
     ...(isRunaway ? [`Budget Alerts: ${budgetLine}`] : []),
     `Anomaly Detection: ${anomalyLine}`,
@@ -320,5 +341,5 @@ export const buildConsult = (form) => {
     `Support Case: ${supportCase}`,
   ];
 
-  return { subject: buildSubject(form.restrictedCountry, total), text: lines.join('\n'), warnings, missing, percent, total, capped, eligibility };
+  return { subject: buildSubject(form.restrictedCountry, totalUsd), text: lines.join('\n'), warnings, missing, percent, total, totalUsd, capped, eligibility };
 };
