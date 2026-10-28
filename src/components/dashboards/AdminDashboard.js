@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOutUser, onAuthStateChange, resetUserPassword, deleteUserFromAuth } from '../../firebase/auth';
-import { getAllTeams, addUserToTeam, getTeam, adminMoveUserToTeam } from '../../services/teams';
+import { getAllTeams, addUserToTeam, adminMoveUserToTeam } from '../../services/teams';
 import { getAllUsers, updateUserRole, getPendingTeamLeaders, approveTeamLeader, rejectTeamLeader, deleteUserCompletely, updateUserFeatures, updateUserProfile, createProvisionedUser, getProvisionedUsers, deleteProvisionedUser } from '../../services/users';
 import { getUpdateAcknowledgmentBreakdown, deleteUpdates, createUpdate } from '../../services/updates';
 import { USER_ROLES } from '../../firebase/auth';
@@ -12,16 +12,16 @@ import ChangePasswordModal from '../ChangePasswordModal';
 import { Button, Card, Badge, Modal, Skeleton, CardSkeleton, EmptyState, Alert, PremiumSelect, ConfirmModal } from '../ui';
 import { showSuccess, showError } from '../../utils/toast';
 import { logger } from '../../utils/logger';
-import SpiiVisualDashboardTab from './SpiiVisualDashboardTab';
-import MetricAnalyticsTab from './MetricAnalyticsTab';
+const SpiiVisualDashboardTab = lazy(() => import('./SpiiVisualDashboardTab'));
+const MetricAnalyticsTab = lazy(() => import('./MetricAnalyticsTab'));
 import { UserGroupIcon, ShieldCheckIcon, UsersIcon, UserIcon, BriefcaseIcon, CheckCircleIcon, ExclamationTriangleIcon, ArrowsRightLeftIcon, TableCellsIcon, PencilSquareIcon, BellIcon, ChevronRightIcon, FunnelIcon, XMarkIcon, UserPlusIcon, ClockIcon, TrashIcon as TrashIconOutline, PlusIcon } from '@heroicons/react/24/outline';
 import AcknowledgmentModal from '../AcknowledgmentModal';
 import UpdateCard from './UpdateCard';
 import CreateUpdateModal from './CreateUpdateModal';
-import SpiiAuditLogsTab from './SpiiAuditLogsTab';
-import SpiiCaseManagementTab from './SpiiCaseManagementTab';
-import FeedbackTab from './FeedbackTab';
-import UtilizationMonitorTab from './UtilizationMonitorTab';
+const SpiiAuditLogsTab = lazy(() => import('./SpiiAuditLogsTab'));
+const SpiiCaseManagementTab = lazy(() => import('./SpiiCaseManagementTab'));
+const FeedbackTab = lazy(() => import('./FeedbackTab'));
+const UtilizationMonitorTab = lazy(() => import('./UtilizationMonitorTab'));
 import DashboardShell from './DashboardShell';
 import Pagination from '../common/Pagination';
 import { logActivity } from '../../services/activity';
@@ -72,7 +72,9 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [pendingTeamLeaders, setPendingTeamLeaders] = useState([]);
-  const [teamNames, setTeamNames] = useState({}); // Cache team names by teamId
+  const [allTeams, setAllTeams] = useState([]);
+  // Team names come from the team list loaded once (it used to re-read every team, one by one, on each users snapshot).
+  const teamNames = useMemo(() => Object.fromEntries(allTeams.map(t => [t.id, t.name || t.id])), [allTeams]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
   const USERS_PER_PAGE = 10;
@@ -94,7 +96,6 @@ const AdminDashboard = () => {
   const [featuresModal, setFeaturesModal] = useState({ isOpen: false, user: null, loading: false });
   const [changeTeamModal, setChangeTeamModal] = useState({ isOpen: false, user: null, selectedTeamId: '', loading: false });
   const [editProfileModal, setEditProfileModal] = useState({ isOpen: false, user: null, displayName: '', isCoAdmin: false, loading: false });
-  const [allTeams, setAllTeams] = useState([]);
   const [updates, setUpdates] = useState([]);
   const [showCreateUpdate, setShowCreateUpdate] = useState(false);
   const [statusBreakdown, setStatusBreakdown] = useState({});
@@ -212,32 +213,6 @@ const AdminDashboard = () => {
   };
 
   // Load team names for users with teamId
-  const loadTeamNames = async (usersData) => {
-    try {
-      const teamIds = [...new Set(usersData.filter(u => u.teamId).map(u => u.teamId))];
-      const teamNamesMap = { ...teamNames };
-
-      for (const teamId of teamIds) {
-        if (!teamNamesMap[teamId] && teamId) {
-          try {
-            const team = await getTeam(teamId);
-            if (team) {
-              teamNamesMap[teamId] = team.name || teamId;
-            }
-          } catch (error) {
-            // Silently handle permission errors - just use teamId as fallback
-            logger.warn(`Could not load team ${teamId}:`, error.message);
-            teamNamesMap[teamId] = teamId; // Fallback to teamId if can't load
-          }
-        }
-      }
-
-      setTeamNames(teamNamesMap);
-    } catch (error) {
-      // Don't show error for team name loading - it's not critical
-      logger.warn('Error loading team names:', error);
-    }
-  };
 
   // Set up real-time listeners for users and pending team leaders
   useEffect(() => {
@@ -257,8 +232,6 @@ const AdminDashboard = () => {
         u.isApproved === false
       ));
       setLoading(false); // Data arrived — clear any loading indicator
-      // Load team names for users with teamId
-      await loadTeamNames(usersData);
     }, (error) => {
       logger.error('AdminDashboard: Error in users listener:', error);
       // Fallback to manual refresh on error
@@ -271,25 +244,6 @@ const AdminDashboard = () => {
     const unsubscribeUpdates = onSnapshot(updatesQuery, (snapshot) => {
       const updatesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setUpdates(updatesData);
-
-      // Load acknowledgment breakdowns for all updates
-      const fetchBreakdowns = async () => {
-        const newBreakdown = { ...statusBreakdown };
-        for (const update of updatesData) {
-          try {
-            // For admin, we use all users as the potential pool
-            const breakdown = await getUpdateAcknowledgmentBreakdown(update.id, users, update.deadline);
-            newBreakdown[update.id] = breakdown;
-          } catch (err) {
-            logger.error(`Failed to load breakdown for update ${update.id}:`, err);
-          }
-        }
-        setStatusBreakdown(newBreakdown);
-      };
-
-      if (users.length > 0) {
-        fetchBreakdowns();
-      }
     }, (error) => {
       logger.error('AdminDashboard: Error in updates listener:', error);
     });
@@ -301,15 +255,28 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  // Update-card acknowledgment counts. Computed here (not inside the mount-only
+  // listener, whose closure only ever saw the initial empty `users`, so the cards
+  // always read 0/0). Recomputed only when the update list or the set of users
+  // changes, with all updates fetched in parallel.
+  const userIdsKey = users.map(u => u.id).join(',');
+  useEffect(() => {
+    if (!updates.length || !users.length) return undefined;
+    let cancelled = false;
+    Promise.all(updates.map(update =>
+      getUpdateAcknowledgmentBreakdown(update.id, users, update.deadline)
+        .then(breakdown => [update.id, breakdown])
+        .catch(err => { logger.error(`Failed to load breakdown for update ${update.id}:`, err); return null; })
+    )).then(entries => { if (!cancelled) setStatusBreakdown(Object.fromEntries(entries.filter(Boolean))); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updates, userIdsKey]);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
       const usersData = await getAllUsers();
       setUsers(usersData);
-      // Load team names for users with teamId (non-blocking)
-      loadTeamNames(usersData).catch(err => {
-        logger.warn('AdminDashboard: Error loading team names:', err);
-      });
     } catch (err) {
       showError('Failed to load users: ' + (err.message || 'Unknown error'));
       logger.error('Error loading users:', err);
@@ -1379,6 +1346,8 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Heavy tabs download on first open (charts only load with the tabs that draw them). */}
+        <Suspense fallback={<CardSkeleton count={2} />}>
         {/* SPII Analytics Tab */}
         {activeTab === 'spii-analytics' && (
           <SpiiVisualDashboardTab currentUser={user} />
@@ -1404,6 +1373,7 @@ const AdminDashboard = () => {
         {activeTab === 'feedback' && (
           <FeedbackTab />
         )}
+        </Suspense>
       </DashboardShell>
 
       {/* Add User (manual provisioning) Modal */}

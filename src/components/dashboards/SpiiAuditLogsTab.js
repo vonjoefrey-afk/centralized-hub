@@ -12,6 +12,10 @@ import { detectSPII } from '../../utils/spiiDetector';
 import { logSpiiAudit } from '../../firebase/firestore';
 import { db } from '../../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import Pagination from '../common/Pagination';
+
+// Rendering every log at once (3,900+ rows ≈ 106k DOM nodes) froze the page; show a page at a time.
+const LOGS_PER_PAGE = 50;
 
 const SpiiAuditLogsTab = ({ currentUser }) => {
     const [logs, setLogs] = useState([]);
@@ -127,6 +131,10 @@ const SpiiAuditLogsTab = ({ currentUser }) => {
             return matchesQuery && matchesTeam;
         });
     }, [logs, searchQuery, selectedTeam]);
+
+    const [logsPage, setLogsPage] = useState(1);
+    useEffect(() => { setLogsPage(1); }, [searchQuery, selectedTeam]);
+    const pagedLogs = filteredLogs.slice((logsPage - 1) * LOGS_PER_PAGE, logsPage * LOGS_PER_PAGE);
 
     if (loading) {
         return (
@@ -289,7 +297,7 @@ const SpiiAuditLogsTab = ({ currentUser }) => {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredLogs.map((log) => (
+                                pagedLogs.map((log) => (
                                     <tr key={log.id} className="group hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors duration-200">
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-4">
@@ -351,6 +359,7 @@ const SpiiAuditLogsTab = ({ currentUser }) => {
                         </tbody>
                     </table>
                 </div>
+                <Pagination page={logsPage} pageSize={LOGS_PER_PAGE} total={filteredLogs.length} onPageChange={setLogsPage} />
             </div>
         </div>
     );
