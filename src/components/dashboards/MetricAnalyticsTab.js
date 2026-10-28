@@ -12,6 +12,9 @@ import { showError, showSuccess } from '../../utils/toast';
 import { downloadCsv } from '../../utils/csv';
 import { formatManilaDateTime } from '../../utils/caseExport';
 import { WORK_TYPE_FILTER_OPTIONS, getWorkType, matchesWorkType } from '../../constants/caseFields';
+import Pagination from '../common/Pagination';
+
+const ROWS_PER_PAGE = 50;
 
 const BACKLOG_STATUSES = ['Assigned', 'WOCR', 'WOCRE', 'IPTP', 'IPGS', 'IPGE', 'IPGO', 'IPCR'];
 
@@ -204,6 +207,11 @@ const MetricAnalyticsTab = () => {
             return true;
         });
     }, [cases, filterTeam, filterUser, filterDateRange, filterStartDate, filterEndDate, filterWorkType, metricIndex, filterIrtOrigin, filterIrtBreachType, filterBacklogStatus]);
+
+    // The table renders a page at a time (it showed every row — 776+ — at once); the CSV still exports all rows.
+    const [rowsPage, setRowsPage] = useState(1);
+    useEffect(() => { setRowsPage(1); }, [filteredRawCases]);
+    const pagedRawCases = filteredRawCases.slice((rowsPage - 1) * ROWS_PER_PAGE, rowsPage * ROWS_PER_PAGE);
 
     // Aggregate IRT Metrics
     const irtStats = useMemo(() => {
@@ -768,7 +776,7 @@ const MetricAnalyticsTab = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-                                        {filteredRawCases.map(c => (
+                                        {pagedRawCases.map(c => (
                                             <tr key={c.id} className="group hover:bg-indigo-50/30 dark:hover:bg-indigo-500/5 transition-colors">
                                                 <td className="px-6 py-5 whitespace-nowrap">
                                                     <div className="text-sm font-black text-gray-900 dark:text-white">#{c.caseId}</div>
@@ -804,7 +812,8 @@ const MetricAnalyticsTab = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            
+                            <Pagination page={rowsPage} pageSize={ROWS_PER_PAGE} total={filteredRawCases.length} onPageChange={setRowsPage} />
+
                             {filteredRawCases.length === 0 && (
                                 <div className="p-20 text-center">
                                     <EmptyState 

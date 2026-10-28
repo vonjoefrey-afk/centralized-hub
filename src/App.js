@@ -27,10 +27,12 @@ import FeedbackButton from './components/common/FeedbackButton';
 import ActivityTracker from './components/ActivityTracker';
 // Lazy-loaded so Mermaid (large) only downloads when someone opens /docs.
 const DocsPage = lazy(() => import('./components/Documentation/DocsPage'));
-import AdminDashboard from './components/dashboards/AdminDashboard';
-import TrainerDashboard from './components/dashboards/TrainerDashboard';
-import TeamLeaderDashboard from './components/dashboards/TeamLeaderDashboard';
-import TeamMemberDashboard from './components/dashboards/TeamMemberDashboard';
+// Each role's dashboard (and the charts/tabs it pulls in) downloads only when
+// that route is opened, instead of every user loading all four up front.
+const AdminDashboard = lazy(() => import('./components/dashboards/AdminDashboard'));
+const TrainerDashboard = lazy(() => import('./components/dashboards/TrainerDashboard'));
+const TeamLeaderDashboard = lazy(() => import('./components/dashboards/TeamLeaderDashboard'));
+const TeamMemberDashboard = lazy(() => import('./components/dashboards/TeamMemberDashboard'));
 import { USER_ROLES } from './firebase/auth';
 import { logger } from './utils/logger';
 import { resumeAudioContext } from './utils/audio';
@@ -143,6 +145,7 @@ function App() {
         <AuthProvider>
           <Router>
             <div className="App min-h-screen bg-gray-50 dark:bg-[#050505] transition-colors duration-300">
+              <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-[#050505]" />}>
               <Routes>
             {/* 
               PUBLIC ROUTES - No authentication required
@@ -208,6 +211,7 @@ function App() {
             */}
               <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </Suspense>
               <FeedbackButton />
               <ActivityTracker />
             </div>
