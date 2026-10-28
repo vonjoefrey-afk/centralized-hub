@@ -29,7 +29,7 @@ const Section = ({ title, children, className }) => (
 
 const Field = ({ label, hint, required, children, className }) => (
   <div className={className}>
-    <div className="flex items-baseline justify-between gap-2 mb-2 ml-1">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 mb-2 ml-1">
       <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-[0.15em]">
         {label}{required && <span className="text-rose-500"> *</span>}
       </span>
@@ -243,10 +243,11 @@ const BmodConsultTab = ({ active = true }) => {
             <Section title={`$ Amount validation — ${form.policy}${form.policy === 'Other' ? ' (TPA format)' : ''}`}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <Field label="Affected dates" required>
-                  <div className="flex items-center gap-2">
-                    <input type="date" value={form.affectedFrom} onChange={setInput('affectedFrom')} aria-label="Affected from" className={inputCls} />
+                  {/* Date inputs can't shrink below ~10rem, so the pair wraps instead of spilling into the next column */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input type="date" value={form.affectedFrom} onChange={setInput('affectedFrom')} aria-label="Affected from" className={clsx(inputCls, 'flex-1 basis-40')} />
                     <span className="text-xs text-gray-400">to</span>
-                    <input type="date" value={form.affectedTo} onChange={setInput('affectedTo')} min={form.affectedFrom || undefined} aria-label="Affected to" className={inputCls} />
+                    <input type="date" value={form.affectedTo} onChange={setInput('affectedTo')} min={form.affectedFrom || undefined} aria-label="Affected to" className={clsx(inputCls, 'flex-1 basis-40')} />
                   </div>
                 </Field>
                 <Field label="Currency">
