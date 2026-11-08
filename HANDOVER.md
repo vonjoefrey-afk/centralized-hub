@@ -20,7 +20,7 @@ Repo: <https://github.com/vonjoefrey-afk/centralized-hub>
 
 ## 2. Prerequisites
 
-- **Node.js 20** (matches Cloud Functions runtime).
+- **Node.js 22** (matches the Cloud Functions runtime; Node 20 was decommissioned 2026-10-31, Node 22 is supported until 2027-10-31).
 - **Firebase CLI** (`npm i -g firebase-tools`) — only needed for manual/local work.
 - A Google account that has been **granted access to the `centralized-gcp`
   GCP/Firebase project** (see §8).
