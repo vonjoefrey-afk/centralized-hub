@@ -14,7 +14,7 @@ import { showSuccess, showError } from '../../utils/toast';
 import { logger } from '../../utils/logger';
 const SpiiVisualDashboardTab = lazy(() => import('./SpiiVisualDashboardTab'));
 const MetricAnalyticsTab = lazy(() => import('./MetricAnalyticsTab'));
-import { UserGroupIcon, ShieldCheckIcon, UsersIcon, UserIcon, BriefcaseIcon, CheckCircleIcon, ExclamationTriangleIcon, ArrowsRightLeftIcon, TableCellsIcon, PencilSquareIcon, BellIcon, ChevronRightIcon, FunnelIcon, XMarkIcon, UserPlusIcon, ClockIcon, TrashIcon as TrashIconOutline, PlusIcon } from '@heroicons/react/24/outline';
+import { UserGroupIcon, ShieldCheckIcon, UsersIcon, UserIcon, BriefcaseIcon, CheckCircleIcon, ExclamationTriangleIcon, ArrowsRightLeftIcon, TableCellsIcon, PencilSquareIcon, BellIcon, ChevronRightIcon, FunnelIcon, XMarkIcon, UserPlusIcon, ClockIcon, TrashIcon as TrashIconOutline, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AcknowledgmentModal from '../AcknowledgmentModal';
 import UpdateCard from './UpdateCard';
 import CreateUpdateModal from './CreateUpdateModal';
@@ -81,6 +81,7 @@ const AdminDashboard = () => {
   const [usersPage, setUsersPage] = useState(1);
   // User-Management drill-down filter, driven by the stat cards.
   const [userFilter, setUserFilter] = useState('all');
+  const [userSearch, setUserSearch] = useState('');
   // Manual "Add User" provisioning.
   const [provisionedUsers, setProvisionedUsers] = useState([]);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -670,8 +671,14 @@ const AdminDashboard = () => {
     { id: 'settings', label: 'System Settings', group: 'System' },
   ];
 
-  // Apply the active stat-card drill-down filter to the roster.
+  // Apply the active stat-card drill-down filter, then the search box, to the roster.
+  const searchTerm = userSearch.trim().toLowerCase();
+  const matchesSearch = (u) => !searchTerm || [
+    u.displayName, u.email, u.firstName, u.lastName,
+    `${u.firstName || ''} ${u.lastName || ''}`, u.role?.replace(/_/g, ' '), teamNames[u.teamId],
+  ].some((v) => v && String(v).toLowerCase().includes(searchTerm));
   const filteredUsers = users.filter((u) => {
+    if (!matchesSearch(u)) return false;
     switch (userFilter) {
       case 'admin': return u.role === USER_ROLES.ADMIN;
       case 'team_leader': return u.role === USER_ROLES.TEAM_LEADER;
@@ -769,6 +776,35 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Search — filters the roster (with any stat-card filter) instead of paging through it */}
+              <div className="px-6 sm:px-8 py-4 border-b border-gray-200/50 dark:border-white/5 flex flex-wrap items-center gap-3">
+                <label className="relative flex-1 min-w-[220px] max-w-xl">
+                  <span className="sr-only">Search users</span>
+                  <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={userSearch}
+                    onChange={(e) => { setUserSearch(e.target.value); setUsersPage(1); }}
+                    placeholder="Search by name, email, team or role…"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/70 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                  />
+                </label>
+                {searchTerm && (
+                  <>
+                    <span className="text-xs font-bold text-gray-500 dark:text-gray-400" aria-live="polite">
+                      {filteredUsers.length} match{filteredUsers.length === 1 ? '' : 'es'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setUserSearch(''); setUsersPage(1); }}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" aria-hidden="true" /> Clear search
+                    </button>
+                  </>
+                )}
+              </div>
+
               {/* Provisioned users awaiting first login */}
               {provisionedUsers.length > 0 && (
                 <div className="px-6 sm:px-8 py-4 bg-amber-500/[0.05] dark:bg-amber-500/[0.08] border-b border-amber-500/15">
@@ -811,8 +847,8 @@ const AdminDashboard = () => {
               {filteredUsers.length === 0 ? (
                 <EmptyState
                   icon={<UserGroupIcon className="h-12 w-12 text-gray-400" />}
-                  title={users.length === 0 ? 'No users yet' : `No ${USER_FILTER_LABELS[userFilter].toLowerCase()}`}
-                  description={users.length === 0 ? 'Users will appear here once they sign up.' : 'Nothing matches this filter — clear it to see everyone.'}
+                  title={users.length === 0 ? 'No users yet' : searchTerm ? `No users match “${userSearch.trim()}”` : `No ${USER_FILTER_LABELS[userFilter].toLowerCase()}`}
+                  description={users.length === 0 ? 'Users will appear here once they sign up.' : searchTerm ? 'Try a different name, email or team, or clear the search.' : 'Nothing matches this filter — clear it to see everyone.'}
                 />
               ) : (
                 <>
