@@ -21,6 +21,7 @@ import {
     WORK_TYPE_OPTIONS, WORK_TYPE_FILTER_OPTIONS, WORK_TYPE_UNCLASSIFIED, getWorkType, matchesWorkType,
 } from '../../constants/caseFields';
 import { downloadCsv } from '../../utils/csv';
+import { isInDateRange } from '../../utils/dateRange';
 import { CASE_TRACKER_CSV_HEADERS, buildCaseTrackerCsvRows, countByWorkType } from '../../utils/caseExport';
 
 // Pill colors for the Case Type badge (Unclassified = legacy cases with no workType).
@@ -264,37 +265,9 @@ const CaseTrackerTab = () => {
             const createdAt = c.createdAt?.toDate ? c.createdAt.toDate() : (c.createdAt ? new Date(c.createdAt) : null);
             if (!createdAt) return false;
 
-            const recordDateStr = getManilaDateString(createdAt);
-            const today = getManilaDateString();
-            const todayObj = new Date(today + 'T00:00:00');
-            const dateObj = new Date(recordDateStr + 'T00:00:00');
-            
-            if (dateFilter === 'Today' && recordDateStr !== today) return false;
-            
-            if (dateFilter === 'Yesterday') {
-                const yesterday = new Date(todayObj);
-                yesterday.setDate(yesterday.getDate() - 1);
-                const yestStr = yesterday.toISOString().split('T')[0];
-                if (recordDateStr !== yestStr) return false;
-            }
-            
-            if (dateFilter === 'Last Week') {
-                const lastWeek = new Date(todayObj);
-                lastWeek.setDate(lastWeek.getDate() - 7);
-                if (dateObj < lastWeek || dateObj > todayObj) return false;
-            }
-            
-            if (dateFilter === 'Last Month') {
-                const lastMonth = new Date(todayObj);
-                lastMonth.setMonth(lastMonth.getMonth() - 1);
-                if (dateObj < lastMonth || dateObj > todayObj) return false;
-            }
-            
-            if (dateFilter === 'Custom' && customDateRange.start && customDateRange.end) {
-                const start = new Date(customDateRange.start + 'T00:00:00');
-                const end = new Date(customDateRange.end + 'T23:59:59');
-                if (createdAt < start || createdAt > end) return false;
-            }
+            // Local-day boundaries for every preset and Custom (Yesterday used to
+            // build its key with toISOString(), i.e. UTC, and selected the day before).
+            if (!isInDateRange(createdAt, dateFilter, customDateRange)) return false;
         }
 
         return true;
